@@ -155,15 +155,26 @@ function matchCuratedSong(itunesTitle: string, itunesArtist: string): CuratedSon
 
 async function loadTodayTrack(): Promise<{ track: MxmTrack | null; curated: CuratedSong | null }> {
   // 1. Try Musixmatch live chart
+  //    Key has access to: chart, snippet, lyrics, richsync (200)
+  //    Key does NOT have: mood/lyricslens, translations (403) — those fall back to curated data
   try {
     const tracks = await fetchChartTracks(100);
     if (tracks.length > 0) {
       const pn = getPuzzleNumber();
       const idx = (pn - 1) % tracks.length;
       const track = tracks[idx];
+      // Check for curated match (gives us mood + translation clues for free)
+      const curatedMatch = matchCuratedSong(track.track_name, track.artist_name);
+      if (curatedMatch) {
+        logger.info(
+          { trackId: track.track_id, title: track.track_name, artist: track.artist_name },
+          "Today's puzzle track (MXM live) matched curated song",
+        );
+        return { track, curated: curatedMatch };
+      }
       logger.info(
         { trackId: track.track_id, title: track.track_name, artist: track.artist_name },
-        "Today's puzzle track selected (Musixmatch live)",
+        "Today's puzzle track selected (MXM live)",
       );
       return { track, curated: null };
     }
@@ -299,17 +310,42 @@ async function buildClue0(puzzle: PuzzleCache): Promise<ClueData> {
     }
   } catch {}
 
+  // Lyricslens (403 on dev key) — derive themes from lyrics words + genre
   if (!themes) {
     try {
       const lyrics = await fetchLyrics(track.track_id);
       if (lyrics?.lyrics_body) {
+        // Extract meaningful content words (skip stop words)
+        const stopWords = new Set(["that","this","with","have","from","they","will","been","were","your","what","when","their","there","then","than","just","like","into","over","also","more","some","such","only","same","other","each","most","which","these","those","about","after","would","could","should","every","never","always","because","before","little","still","where"]);
         const words = lyrics.lyrics_body
+          .toLowerCase()
+          .replace(/[^\w\s]/g, " ")
           .split(/\s+/)
-          .filter((w) => w.length > 4)
-          .slice(0, 3);
-        themes = words.length ? words : ["mystery", "feeling", "rhythm"];
+          .filter((w) => w.length > 4 && !stopWords.has(w));
+        // Deduplicate and pick top words by frequency
+        const freq: Record<string, number> = {};
+        for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
+        const topWords = Object.entries(freq)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(([w]) => w);
+        themes = topWords.length >= 2 ? topWords : null;
       }
     } catch {}
+  }
+
+  // Derive mood from genre if available
+  if (!mood && track.primary_genres) {
+    const genre = (track as unknown as { primary_genres?: { music_genre_list?: Array<{ music_genre: { music_genre_name: string } }> } })
+      .primary_genres?.music_genre_list?.[0]?.music_genre?.music_genre_name;
+    if (genre) {
+      const genreMoodMap: Record<string, string> = {
+        Pop: "Upbeat", Rock: "Powerful", Country: "Heartfelt", "Hip-Hop": "Energetic",
+        "R&B": "Soulful", Electronic: "Electric", Jazz: "Smooth", Classical: "Elegant",
+        Folk: "Intimate", Metal: "Intense", Soul: "Emotional", Indie: "Wistful",
+      };
+      mood = genreMoodMap[genre] ?? genre;
+    }
   }
 
   return {
@@ -321,7 +357,7 @@ async function buildClue0(puzzle: PuzzleCache): Promise<ClueData> {
 }
 
 async function buildClue1(puzzle: PuzzleCache): Promise<ClueData> {
-  // Curated fallback
+  // Curated fallback — has hand-crafted translations
   if (puzzle.curated) {
     return {
       stage: 1,
@@ -338,12 +374,14 @@ async function buildClue1(puzzle: PuzzleCache): Promise<ClueData> {
   const lang = pickTranslationLanguage(puzzleNumber);
   let translatedLine: string | null = null;
 
+  // Try MXM translations (requires Pro tier — may be 403)
   try {
     const translations = await fetchTranslations(track.track_id);
     const match = translations.find((t) => t.language === lang.code);
     if (match?.description) translatedLine = match.description;
   } catch {}
 
+  // Fallback: use MXM snippet as the "clue line" (snippet.get returns 200 on dev key)
   if (!translatedLine) {
     try {
       const snippet = await fetchSnippet(track.track_id);
@@ -351,10 +389,22 @@ async function buildClue1(puzzle: PuzzleCache): Promise<ClueData> {
     } catch {}
   }
 
+  // Last resort: pick a line from the full lyrics
+  if (!translatedLine) {
+    try {
+      const lyrics = await fetchLyrics(track.track_id);
+      if (lyrics?.lyrics_body) {
+        const lines = lyrics.lyrics_body.split("\n").filter((l) => l.trim().length > 10);
+        translatedLine = lines[Math.floor(lines.length * 0.3)] ?? lines[0] ?? null;
+      }
+    } catch {}
+  }
+
   return {
     stage: 1,
     stageLabel: STAGE_LABELS[1],
     translatedLine,
+    // When falling back to English snippet, label as "Lyric Clue" not a specific language
     translationLanguage: translatedLine ? lang.name : null,
     translationLanguageCode: translatedLine ? lang.code : null,
   };

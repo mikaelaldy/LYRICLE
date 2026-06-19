@@ -12,9 +12,9 @@ Each day a new song is chosen. You get five clue stages, unlocked one at a time.
 
 | Stage | Clue | Musixmatch API |
 |-------|------|----------------|
-| 1 | **Vibes & Themes** — mood tags and thematic clusters | `track.lyrics.mood.get` (Lyricslens) |
-| 2 | **Lost in Translation** — one lyric line translated to another language | `crowd.track.translations.get` |
-| 3 | **Snippet** — a single cryptic line from the lyrics | `track.snippet.get` |
+| 1 | **Vibes & Themes** — mood tags and thematic clusters derived from the lyrics | `track.lyrics.get` + `chart.tracks.get` |
+| 2 | **Lyric Clue** — one cryptic line from the song | `track.snippet.get` |
+| 3 | **Lyric Snippet** — a different line from the song | `track.snippet.get` + `track.lyrics.get` |
 | 4 | **Word by Word** — the full richsynced lyric, revealed one word at a time | `track.richsync.get` |
 | 5 | **Listen** — a 30-second Spotify audio preview + album art | Spotify oEmbed / iTunes |
 

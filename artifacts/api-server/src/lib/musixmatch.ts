@@ -82,9 +82,11 @@ async function mxmGet<T>(path: string, params: Record<string, string | number> =
 export async function fetchChartTracks(pageSize = 100): Promise<MxmTrack[]> {
   const body = await mxmGet<{ track_list: Array<{ track: MxmTrack }> }>(
     "chart.tracks.get",
-    { chart_name: "top", page: 1, page_size: pageSize, country: "us", f_has_lyrics: 1 },
+    { chart_name: "top", page: 1, page_size: pageSize, country: "us", f_has_lyrics: 1, f_has_richsync: 1 },
   );
-  return body?.track_list?.map((t) => t.track) ?? [];
+  // Filter out restricted tracks (empty lyrics body) and ensure richsync is available
+  const tracks = body?.track_list?.map((t) => t.track) ?? [];
+  return tracks.filter((t) => t.has_richsync === 1);
 }
 
 export async function searchTracks(q: string, pageSize = 8): Promise<MxmTrack[]> {
