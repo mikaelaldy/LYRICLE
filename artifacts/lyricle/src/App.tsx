@@ -8,6 +8,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Game from "@/pages/Game";
+import Landing from "@/pages/Landing";
 import Leaderboard from "@/pages/Leaderboard";
 import NotFound from "@/pages/not-found";
 
@@ -91,10 +92,17 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+function HomeRoute() {
+  const { user, isLoaded } = useUser();
+  if (!isLoaded) return null;
+  return user ? <Game /> : <Landing />;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Game} />
+      <Route path="/" component={HomeRoute} />
+      <Route path="/game" component={Game} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
