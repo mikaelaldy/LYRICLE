@@ -23,14 +23,11 @@ const router: IRouter = Router();
 
 // GET /puzzle/today
 router.get("/puzzle/today", async (_req, res): Promise<void> => {
-  const puzzle = await getPuzzleCache();
-  if (!puzzle) {
-    res.status(503).json({ error: "Puzzle unavailable — Musixmatch API may not be configured" });
-    return;
-  }
+  const date = getTodayDateString();
+  const puzzleNumber = getPuzzleNumber();
   res.json({
-    puzzleNumber: puzzle.puzzleNumber,
-    date: puzzle.date,
+    puzzleNumber,
+    date,
     totalClues: 5,
     nextPuzzleAt: getNextPuzzleAt(),
   });

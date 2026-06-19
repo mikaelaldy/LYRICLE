@@ -1,0 +1,1 @@
+- [Lyricle architecture](lyricle-arch.md) — daily lyric-guessing game; puzzle/clue endpoints need MXM_KEY; puzzle/today is key-free.
