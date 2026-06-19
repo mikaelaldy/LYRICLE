@@ -47,6 +47,7 @@ interface PuzzleCache {
   puzzleNumber: number;
   track: MxmTrack | null;
   curated: CuratedSong | null;
+  albumArtUrl: string | null;
   clues: Partial<Record<number, ClueData>>;
 }
 
@@ -115,11 +116,20 @@ export async function getPuzzleCache(): Promise<PuzzleCache | null> {
   const { track, curated } = await loadTodayTrack();
   if (!track && !curated) return null;
 
+  // Pre-warm album art so Stage 4 never blocks on a live oEmbed round-trip
+  let albumArtUrl: string | null = null;
+  if (curated?.spotifyTrackId) {
+    albumArtUrl = await fetchSpotifyAlbumArt(curated.spotifyTrackId);
+  } else if (track) {
+    albumArtUrl = track.album_coverart_800x800 || track.album_coverart_100x100 || null;
+  }
+
   cache = {
     date: today,
     puzzleNumber: getPuzzleNumber(),
     track,
     curated,
+    albumArtUrl,
     clues: {},
   };
   return cache;
@@ -300,16 +310,14 @@ async function fetchSpotifyAlbumArt(trackId: string | null): Promise<string | nu
 }
 
 async function buildClue4(puzzle: PuzzleCache): Promise<ClueData> {
-  // Curated fallback
+  // albumArtUrl is pre-warmed during puzzle initialisation — no live oEmbed call needed
   if (puzzle.curated) {
-    const spotifyTrackId = puzzle.curated.spotifyTrackId;
-    const albumArtUrl = await fetchSpotifyAlbumArt(spotifyTrackId);
     return {
       stage: 4,
       stageLabel: STAGE_LABELS[4],
       previewUrl: null,
-      albumArtUrl,
-      spotifyTrackId,
+      albumArtUrl: puzzle.albumArtUrl,
+      spotifyTrackId: puzzle.curated.spotifyTrackId,
     };
   }
 
@@ -320,7 +328,7 @@ async function buildClue4(puzzle: PuzzleCache): Promise<ClueData> {
     stage: 4,
     stageLabel: STAGE_LABELS[4],
     previewUrl: null,
-    albumArtUrl: track.album_coverart_800x800 || track.album_coverart_100x100 || null,
+    albumArtUrl: puzzle.albumArtUrl,
     spotifyTrackId: track.track_spotify_id || null,
   };
 }
@@ -399,7 +407,7 @@ export async function getSongReveal(): Promise<{
     return {
       title: puzzle.curated.trackName,
       artist: puzzle.curated.artistName,
-      albumArtUrl: null,
+      albumArtUrl: puzzle.albumArtUrl,
       spotifyTrackId: puzzle.curated.spotifyTrackId,
       previewUrl: null,
       meaning: null,
