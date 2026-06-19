@@ -1,7 +1,7 @@
 /**
  * Partner API proxy routes — JamBase (concerts) and Songstats (stream counts).
- * Both routes degrade gracefully if the env keys are absent or the upstream
- * API returns no data, so the UI can safely hide sections rather than error.
+ * Both routes degrade gracefully if env keys are absent or the upstream API
+ * returns no usable data, so the UI can safely hide sections rather than error.
  */
 import { Router, type IRouter } from "express";
 import { logger } from "../lib/logger";
@@ -11,7 +11,7 @@ const router: IRouter = Router();
 const JAMBASE_KEY = process.env.JAMBASE_API_KEY ?? "";
 const SONGSTATS_KEY = process.env.SONGSTATS_API_KEY ?? "";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── HTTP helper ──────────────────────────────────────────────────────────────
 
 async function jsonGet<T>(url: string, headers: Record<string, string> = {}): Promise<T | null> {
   try {
@@ -19,7 +19,10 @@ async function jsonGet<T>(url: string, headers: Record<string, string> = {}): Pr
     const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, { signal: controller.signal, headers });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      logger.warn({ url, status: res.status }, "Partner API non-OK response");
+      return null;
+    }
     return (await res.json()) as T;
   } catch (err) {
     logger.warn({ url, err }, "Partner API fetch error");
@@ -34,6 +37,19 @@ function toSlug(name: string): string {
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 // ─── GET /artist/concerts?artist=<name> ──────────────────────────────────────
@@ -78,35 +94,45 @@ router.get("/artist/concerts", async (req, res): Promise<void> => {
     url.searchParams.set("page", "0");
     url.searchParams.set("perPage", "3");
 
-    type JamBaseResponse = { success: boolean; events?: JamBaseEvent[] };
+    type JamBaseResponse = { success: boolean; events?: JamBaseEvent[]; errors?: Array<{ code: string; message: string }> };
     const data = await jsonGet<JamBaseResponse>(url.toString());
 
-    if (!data?.success || !data.events?.length) {
+    if (!data?.success) {
+      // Key invalid or rate-limited — log and degrade gracefully
+      logger.warn({ errors: data?.errors }, "JamBase API returned unsuccessful response");
+      res.json({ concerts: [] });
+      return;
+    }
+
+    if (!data.events?.length) {
       res.json({ concerts: [] });
       return;
     }
 
     const concerts: ConcertResult[] = data.events.map((e) => ({
       venueName: e.location?.name ?? "Venue TBA",
-      city: [
-        e.location?.address?.addressLocality,
-        e.location?.address?.addressRegion,
-      ]
-        .filter(Boolean)
-        .join(", ") || "Location TBA",
-      date: e.startDate ?? "",
+      city:
+        [e.location?.address?.addressLocality, e.location?.address?.addressRegion]
+          .filter(Boolean)
+          .join(", ") || "Location TBA",
+      date: e.startDate ? formatDate(e.startDate) : "",
       url: e.url ?? null,
     }));
 
     res.json({ concerts });
   } catch (err) {
     logger.error({ err, artist }, "JamBase concerts error");
-    res.json({ concerts: [] }); // graceful fallback
+    res.json({ concerts: [] });
   }
 });
 
 // ─── GET /track/stats?artist=<name>&title=<title> ────────────────────────────
 // Proxies Songstats API. Returns Spotify stream count for the track.
+//
+// Songstats API shape (enterprise/v1):
+//   Search:  GET /tracks/search?q=<query>&limit=N  → { result, results: [{ songstats_track_id, title, artists }] }
+//   Stats:   GET /tracks/stats?songstats_track_id=<id>&source=spotify
+//            → { result, stats: [{ source, data: { streams_total: "1234567890.0" } }] }
 
 router.get("/track/stats", async (req, res): Promise<void> => {
   const artist = typeof req.query.artist === "string" ? req.query.artist.trim() : "";
@@ -124,17 +150,18 @@ router.get("/track/stats", async (req, res): Promise<void> => {
   }
 
   try {
-    // Step 1: search for the track on Songstats
+    // Step 1: search for the track
     const searchUrl = new URL("https://api.songstats.com/enterprise/v1/tracks/search");
     searchUrl.searchParams.set("q", `${title} ${artist}`);
     searchUrl.searchParams.set("limit", "5");
 
     type SongstatsSearchResult = {
-      tracks?: Array<{
-        isrc?: string;
-        spotify_track_id?: string;
+      result: string;
+      results?: Array<{
+        songstats_track_id: string;
         title?: string;
-        artist_name?: string;
+        artists?: Array<{ name: string; songstats_artist_id: string }>;
+        is_remix?: boolean;
       }>;
     };
 
@@ -142,35 +169,57 @@ router.get("/track/stats", async (req, res): Promise<void> => {
       apikey: SONGSTATS_KEY,
     });
 
-    const track = searchData?.tracks?.[0];
-    if (!track) {
+    if (searchData?.result !== "success" || !searchData.results?.length) {
       res.json({ streams: null });
       return;
     }
 
-    // Step 2: fetch Spotify stats for the track using its ISRC or spotify ID
-    const statsUrl = new URL("https://api.songstats.com/enterprise/v1/tracks/stats");
-    if (track.isrc) statsUrl.searchParams.set("isrc", track.isrc);
-    else if (track.spotify_track_id) statsUrl.searchParams.set("spotifyTrackId", track.spotify_track_id);
-    else {
+    // Pick the best non-remix match (prefer tracks where artist name appears)
+    const lowerArtist = artist.toLowerCase();
+    const track =
+      searchData.results.find(
+        (t) =>
+          !t.is_remix &&
+          t.artists?.some((a) => a.name.toLowerCase().includes(lowerArtist.split(" ")[0])),
+      ) ?? searchData.results[0];
+
+    if (!track?.songstats_track_id) {
       res.json({ streams: null });
       return;
     }
+
+    // Step 2: fetch Spotify stats using the Songstats track ID
+    const statsUrl = new URL("https://api.songstats.com/enterprise/v1/tracks/stats");
+    statsUrl.searchParams.set("songstats_track_id", track.songstats_track_id);
     statsUrl.searchParams.set("source", "spotify");
 
     type SongstatsStatsResult = {
-      stats?: { spotify?: { streams?: number } };
+      result: string;
+      stats?: Array<{
+        source: string;
+        data?: {
+          streams_total?: string | number;
+        };
+      }>;
     };
 
     const statsData = await jsonGet<SongstatsStatsResult>(statsUrl.toString(), {
       apikey: SONGSTATS_KEY,
     });
 
-    const streams = statsData?.stats?.spotify?.streams ?? null;
-    res.json({ streams });
+    if (statsData?.result !== "success" || !statsData.stats?.length) {
+      res.json({ streams: null });
+      return;
+    }
+
+    const spotifyStats = statsData.stats.find((s) => s.source === "spotify");
+    const rawStreams = spotifyStats?.data?.streams_total;
+    const streams = rawStreams != null ? Math.round(parseFloat(String(rawStreams))) : null;
+
+    res.json({ streams: streams && streams > 0 ? streams : null });
   } catch (err) {
     logger.error({ err, artist, title }, "Songstats stats error");
-    res.json({ streams: null }); // graceful fallback
+    res.json({ streams: null });
   }
 });
 
