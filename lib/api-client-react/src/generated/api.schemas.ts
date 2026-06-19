@@ -168,6 +168,15 @@ export interface ResultResponse {
   streak?: number | null;
 }
 
+export interface StreakLeaderboardEntry {
+  rank: number;
+  displayName: string;
+  currentStreak: number;
+  winCount: number;
+  maxStreak: number;
+  totalPlays: number;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   displayName: string;

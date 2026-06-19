@@ -33,7 +33,8 @@ import type {
   PuzzleStats,
   ResultInput,
   ResultResponse,
-  SongReveal
+  SongReveal,
+  StreakLeaderboardEntry
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -588,6 +589,47 @@ export const useSubmitResult = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getSubmitResultMutationOptions(options));
     }
+
+export const getGetStreakLeaderboardUrl = () => {
+  return `/api/players/leaderboard`
+}
+
+/**
+ * @summary Get weekly streak leaderboard (top 20 by current streak)
+ */
+export const getStreakLeaderboard = async (options?: RequestInit): Promise<StreakLeaderboardEntry[]> => {
+  return customFetch<StreakLeaderboardEntry[]>(getGetStreakLeaderboardUrl(), {
+    ...options,
+    method: 'GET',
+  });
+}
+
+export const getGetStreakLeaderboardQueryKey = () => {
+  return [`/api/players/leaderboard`] as const;
+}
+
+export const getGetStreakLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getStreakLeaderboard>>, TError = ErrorType<unknown>>(
+  options?: { query?: UseQueryOptions<Awaited<ReturnType<typeof getStreakLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch> }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetStreakLeaderboardQueryKey();
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreakLeaderboard>>> = ({ signal }) => getStreakLeaderboard({ signal, ...requestOptions });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof getStreakLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStreakLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getStreakLeaderboard>>>
+export type GetStreakLeaderboardQueryError = ErrorType<unknown>
+
+/**
+ * @summary Get weekly streak leaderboard (top 20 by current streak)
+ */
+export function useGetStreakLeaderboard<TData = Awaited<ReturnType<typeof getStreakLeaderboard>>, TError = ErrorType<unknown>>(
+  options?: { query?: UseQueryOptions<Awaited<ReturnType<typeof getStreakLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch> }
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStreakLeaderboardQueryOptions(options)
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export const getGetLeaderboardUrl = () => {
 

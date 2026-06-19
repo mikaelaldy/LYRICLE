@@ -192,6 +192,21 @@ paths:
         "404":
           description: Player not found
 
+  /players/leaderboard:
+    get:
+      operationId: getStreakLeaderboard
+      tags: [players]
+      summary: Get weekly streak leaderboard (top 20 by current streak)
+      responses:
+        "200":
+          description: Top players this week by streak
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StreakLeaderboardEntry"
+
   /players/me/stats:
     get:
       operationId: getMyStats
@@ -420,6 +435,29 @@ components:
           description: Updated streak count after this result
       required:
         - ok
+
+    StreakLeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        displayName:
+          type: string
+        currentStreak:
+          type: integer
+        winCount:
+          type: integer
+        maxStreak:
+          type: integer
+        totalPlays:
+          type: integer
+      required:
+        - rank
+        - displayName
+        - currentStreak
+        - winCount
+        - maxStreak
+        - totalPlays
 
     LeaderboardEntry:
       type: object

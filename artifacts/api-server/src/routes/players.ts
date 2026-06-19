@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { dailyResultsTable, playerStreaksTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { GetPlayerStreakParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -88,6 +88,43 @@ router.get("/players/me/stats", async (req, res): Promise<void> => {
     lastPlayedDate: streak?.lastPlayedDate ?? null,
     clueDistribution,
   });
+});
+
+// GET /players/leaderboard — weekly streak leaderboard, top 20
+router.get("/players/leaderboard", async (_req, res): Promise<void> => {
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+
+  const rows = await db
+    .select({
+      playerId: playerStreaksTable.playerId,
+      currentStreak: playerStreaksTable.currentStreak,
+      winCount: playerStreaksTable.winCount,
+      maxStreak: playerStreaksTable.maxStreak,
+      totalPlays: playerStreaksTable.totalPlays,
+      displayName: sql<string>`(
+        SELECT display_name FROM daily_results
+        WHERE player_id = ${playerStreaksTable.playerId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      )`,
+    })
+    .from(playerStreaksTable)
+    .where(sql`${playerStreaksTable.lastPlayedDate} >= ${weekAgoStr}`)
+    .orderBy(desc(playerStreaksTable.currentStreak), desc(playerStreaksTable.winCount))
+    .limit(20);
+
+  const leaderboard = rows.map((r, i) => ({
+    rank: i + 1,
+    displayName: r.displayName ?? "Anonymous",
+    currentStreak: r.currentStreak,
+    winCount: r.winCount,
+    maxStreak: r.maxStreak,
+    totalPlays: r.totalPlays,
+  }));
+
+  res.json(leaderboard);
 });
 
 export default router;

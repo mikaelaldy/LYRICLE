@@ -7,6 +7,10 @@ import { Music2, Headphones, Trophy, Zap, Calendar, Globe } from "lucide-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+function cn(...classes: (string | boolean | undefined | null)[]) {
+  return classes.filter(Boolean).join(" ");
+}
+
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.25, 0.1, 0.25, 1] } },
@@ -162,9 +166,9 @@ export default function Landing() {
   }, []);
 
   const statsItems = [
-    { value: stats.totalCompletions, suffix: "+", label: "Puzzles Solved", sub: "and counting" },
-    { value: stats.playersToday, suffix: "", label: "Players Today", sub: "across 80+ countries" },
-    { value: stats.streakLeaders, suffix: "", label: "Streak Leaders", sub: "on the all-time board" },
+    { value: stats.totalCompletions, suffix: "+", label: "Puzzles Solved", sub: "and counting", href: null },
+    { value: stats.playersToday, suffix: "", label: "Players Today", sub: "across 80+ countries", href: null },
+    { value: stats.streakLeaders, suffix: "", label: "Streak Leaders", sub: "see the leaderboard →", href: `${basePath}/leaderboard` },
   ];
 
   return (
@@ -355,17 +359,18 @@ export default function Landing() {
           className="max-w-4xl mx-auto"
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:divide-x divide-border">
-            {statsItems.map(({ value, suffix, label, sub }) => (
+            {statsItems.map(({ value, suffix, label, sub, href }) => (
               <motion.div
                 key={label}
                 variants={fadeUp}
-                className="flex flex-col items-center text-center sm:px-8 gap-1"
+                className={cn("flex flex-col items-center text-center sm:px-8 gap-1", href && "cursor-pointer group")}
+                onClick={href ? () => setLocation(href) : undefined}
               >
                 <span className="font-serif italic font-black text-4xl sm:text-5xl text-primary">
                   <CountUp target={value} suffix={suffix} started={inView} />
                 </span>
                 <span className="font-sans font-semibold text-foreground text-sm tracking-wide uppercase">{label}</span>
-                <span className="font-mono text-muted-foreground text-xs">{sub}</span>
+                <span className={cn("font-mono text-xs", href ? "text-primary group-hover:underline" : "text-muted-foreground")}>{sub}</span>
               </motion.div>
             ))}
           </div>
