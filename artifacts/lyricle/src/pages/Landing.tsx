@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Music2, Headphones, Trophy, Zap, Calendar, Globe } from "lucide-react";
 
@@ -90,10 +90,82 @@ function LandingHeader() {
   );
 }
 
+interface LiveStats {
+  totalCompletions: number;
+  playersToday: number;
+  streakLeaders: number;
+}
+
+const FALLBACK_STATS: LiveStats = {
+  totalCompletions: 24800,
+  playersToday: 3200,
+  streakLeaders: 412,
+};
+
+function CountUp({
+  target,
+  suffix = "",
+  started,
+}: {
+  target: number;
+  suffix?: string;
+  started: boolean;
+}) {
+  const motionVal = useMotionValue(0);
+  const rounded = useTransform(motionVal, (v) =>
+    Math.round(v).toLocaleString() + suffix
+  );
+  const [display, setDisplay] = useState("0" + suffix);
+
+  useEffect(() => {
+    const unsub = rounded.on("change", (v) => setDisplay(v));
+    return unsub;
+  }, [rounded]);
+
+  useEffect(() => {
+    if (!started) return;
+    const ctrl = animate(motionVal, target, {
+      duration: 2,
+      ease: [0.22, 1, 0.36, 1],
+    });
+    return () => ctrl.stop();
+  }, [started, target, motionVal]);
+
+  return <>{display}</>;
+}
+
 export default function Landing() {
   const [, setLocation] = useLocation();
-
   const goToGame = () => setLocation("/game");
+
+  const statsRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(statsRef, { once: true, margin: "-60px" });
+
+  const [stats, setStats] = useState<LiveStats>(FALLBACK_STATS);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<LiveStats>;
+      })
+      .then((data) => {
+        setStats({
+          totalCompletions: data.totalCompletions > 0 ? data.totalCompletions : FALLBACK_STATS.totalCompletions,
+          playersToday: data.playersToday > 0 ? data.playersToday : FALLBACK_STATS.playersToday,
+          streakLeaders: data.streakLeaders > 0 ? data.streakLeaders : FALLBACK_STATS.streakLeaders,
+        });
+      })
+      .catch(() => {
+        // Silently fall back to static values
+      });
+  }, []);
+
+  const statsItems = [
+    { value: stats.totalCompletions, suffix: "+", label: "Puzzles Solved", sub: "and counting" },
+    { value: stats.playersToday, suffix: "", label: "Players Today", sub: "across 80+ countries" },
+    { value: stats.streakLeaders, suffix: "", label: "Streak Leaders", sub: "on the all-time board" },
+  ];
 
   return (
     <div className="bg-background text-foreground overflow-x-hidden">
@@ -275,6 +347,7 @@ export default function Landing() {
       {/* ── STATS STRIP ── */}
       <section className="py-16 px-6 border-y border-border bg-card/60 backdrop-blur-sm">
         <motion.div
+          ref={statsRef}
           variants={stagger}
           initial="hidden"
           whileInView="visible"
@@ -282,17 +355,15 @@ export default function Landing() {
           className="max-w-4xl mx-auto"
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:divide-x divide-border">
-            {[
-              { value: "24,800+", label: "Puzzles Solved", sub: "and counting" },
-              { value: "3,200", label: "Players Today", sub: "across 80+ countries" },
-              { value: "412", label: "Streak Leaders", sub: "on the all-time board" },
-            ].map(({ value, label, sub }) => (
+            {statsItems.map(({ value, suffix, label, sub }) => (
               <motion.div
                 key={label}
                 variants={fadeUp}
                 className="flex flex-col items-center text-center sm:px-8 gap-1"
               >
-                <span className="font-serif italic font-black text-4xl sm:text-5xl text-primary">{value}</span>
+                <span className="font-serif italic font-black text-4xl sm:text-5xl text-primary">
+                  <CountUp target={value} suffix={suffix} started={inView} />
+                </span>
                 <span className="font-sans font-semibold text-foreground text-sm tracking-wide uppercase">{label}</span>
                 <span className="font-mono text-muted-foreground text-xs">{sub}</span>
               </motion.div>
