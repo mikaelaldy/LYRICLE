@@ -15,14 +15,15 @@ if [ -n "$GITHUB_TOKEN" ]; then
   printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" > "$CRED_FILE"
   chmod 600 "$CRED_FILE"
 
+  # Replit is always the authoritative source. Use --force so that any
+  # commits that landed directly on GitHub (e.g. from a task-agent push
+  # during setup) are overwritten by the Replit workspace state.
   if git -c "credential.helper=store --file=$CRED_FILE" \
-         push https://github.com/mikaelaldy/lyricle.git HEAD:main 2>&1; then
+         push --force https://github.com/mikaelaldy/lyricle.git HEAD:main 2>&1; then
     echo "GitHub sync complete."
   else
-    echo "WARNING: GitHub sync failed — the remote may have diverged from" \
-         "the Replit workspace (e.g. a direct commit was pushed to GitHub)." \
-         "Resolve manually: pull the conflicting changes or force-push from" \
-         "a local clone once you are sure the Replit copy is authoritative."
+    echo "WARNING: GitHub sync failed — check that GITHUB_TOKEN has Contents:write" \
+         "permission on mikaelaldy/lyricle and has not expired."
   fi
 else
   echo "GITHUB_TOKEN not set — skipping GitHub sync."
