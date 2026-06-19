@@ -3,20 +3,24 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Lyricle — Daily lyric-guessing game API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: puzzle
+    description: Daily puzzle operations
+  - name: players
+    description: Player stats and streaks
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +28,185 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /puzzle/today:
+    get:
+      operationId: getTodayPuzzle
+      tags: [puzzle]
+      summary: Get today's puzzle metadata
+      description: Returns the puzzle number and date. Does not reveal the song.
+      responses:
+        "200":
+          description: Today's puzzle info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PuzzleInfo"
+
+  /puzzle/clue/{stage}:
+    get:
+      operationId: getPuzzleClue
+      tags: [puzzle]
+      summary: Get a specific clue stage
+      description: |
+        Stage 0 = lyricslens themes/mood (most abstract),
+        Stage 1 = translated lyric line,
+        Stage 2 = short snippet,
+        Stage 3 = richsync word-by-word reveal,
+        Stage 4 = audio/album art (most revealing)
+      parameters:
+        - name: stage
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 4
+      responses:
+        "200":
+          description: Clue data for the requested stage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PuzzleClue"
+        "400":
+          description: Invalid stage
+
+  /puzzle/autocomplete:
+    get:
+      operationId: puzzleAutocomplete
+      tags: [puzzle]
+      summary: Autocomplete track search for guesses
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching tracks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutocompleteResult"
+
+  /puzzle/guess:
+    post:
+      operationId: submitGuess
+      tags: [puzzle]
+      summary: Submit a guess
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuessInput"
+      responses:
+        "200":
+          description: Guess result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuessResult"
+
+  /puzzle/answer:
+    get:
+      operationId: getPuzzleAnswer
+      tags: [puzzle]
+      summary: Reveal today's song (shown after game ends)
+      responses:
+        "200":
+          description: Full song reveal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SongReveal"
+
+  /puzzle/result:
+    post:
+      operationId: submitResult
+      tags: [puzzle]
+      summary: Submit a completed game result for the leaderboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResultInput"
+      responses:
+        "200":
+          description: Result recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResultResponse"
+
+  /puzzle/leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [puzzle]
+      summary: Get today's leaderboard
+      responses:
+        "200":
+          description: Today's top players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  /puzzle/stats:
+    get:
+      operationId: getPuzzleStats
+      tags: [puzzle]
+      summary: Get today's puzzle statistics
+      description: Total plays, win rate, and clue-usage distribution
+      responses:
+        "200":
+          description: Puzzle stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PuzzleStats"
+
+  /players/{playerId}/streak:
+    get:
+      operationId: getPlayerStreak
+      tags: [players]
+      summary: Get a player's streak info (anonymous by playerId)
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Streak info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerStreak"
+        "404":
+          description: Player not found
+
+  /players/me/stats:
+    get:
+      operationId: getMyStats
+      tags: [players]
+      summary: Get full stats for the logged-in user (Clerk auth required)
+      responses:
+        "200":
+          description: Full player stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerStats"
+        "401":
+          description: Not authenticated
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +217,317 @@ components:
       required:
         - status
 
+    PuzzleInfo:
+      type: object
+      properties:
+        puzzleNumber:
+          type: integer
+          description: Sequential puzzle number (day 1 = 1, etc.)
+        date:
+          type: string
+          description: ISO date string (YYYY-MM-DD)
+        totalClues:
+          type: integer
+          description: Total number of clue stages (always 5)
+        nextPuzzleAt:
+          type: string
+          description: ISO datetime when the next puzzle unlocks
+      required:
+        - puzzleNumber
+        - date
+        - totalClues
+        - nextPuzzleAt
+
+    PuzzleClue:
+      type: object
+      description: A single clue stage. Only the fields relevant to the stage are populated.
+      properties:
+        stage:
+          type: integer
+        stageLabel:
+          type: string
+          description: Human-readable stage name
+        # Stage 0 — lyricslens themes
+        themes:
+          type: ["array", "null"]
+          items:
+            type: string
+          description: Lyric theme keywords (stage 0)
+        mood:
+          type: ["string", "null"]
+          description: Overall mood label (stage 0)
+        # Stage 1 — translated lyric
+        translatedLine:
+          type: ["string", "null"]
+          description: A lyric line translated into another language (stage 1)
+        translationLanguage:
+          type: ["string", "null"]
+          description: Name of the language the line was translated into (stage 1)
+        translationLanguageCode:
+          type: ["string", "null"]
+          description: ISO language code (stage 1)
+        # Stage 2 — snippet
+        snippet:
+          type: ["string", "null"]
+          description: Short lyric snippet (stage 2)
+        # Stage 3 — richsync word reveal
+        richsyncWords:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/RichsyncWord"
+          description: Word-level synced lyrics for a chorus line (stage 3)
+        richsyncDurationMs:
+          type: ["integer", "null"]
+          description: Total duration of the richsync segment in ms (stage 3)
+        # Stage 4 — audio
+        previewUrl:
+          type: ["string", "null"]
+          description: 30-second Spotify preview URL (stage 4)
+        albumArtUrl:
+          type: ["string", "null"]
+          description: Album artwork URL (stage 4)
+        spotifyTrackId:
+          type: ["string", "null"]
+          description: Spotify track ID for embed (stage 4)
+      required:
+        - stage
+        - stageLabel
+
+    RichsyncWord:
+      type: object
+      properties:
+        word:
+          type: string
+        startMs:
+          type: integer
+        endMs:
+          type: integer
+      required:
+        - word
+        - startMs
+        - endMs
+
+    AutocompleteResult:
+      type: object
+      properties:
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackSuggestion"
+      required:
+        - tracks
+
+    TrackSuggestion:
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: "Artist — Title"
+        artist:
+          type: string
+        title:
+          type: string
+        albumArtUrl:
+          type: ["string", "null"]
+      required:
+        - displayName
+        - artist
+        - title
+        - albumArtUrl
+
+    GuessInput:
+      type: object
+      properties:
+        artist:
+          type: string
+        title:
+          type: string
+      required:
+        - artist
+        - title
+
+    GuessResult:
+      type: object
+      properties:
+        correct:
+          type: boolean
+        normalizedGuess:
+          type: string
+          description: How the server normalized the guess
+        hint:
+          type: ["string", "null"]
+          description: Optional closeness hint on wrong guess
+      required:
+        - correct
+        - normalizedGuess
+
+    SongReveal:
+      type: object
+      properties:
+        title:
+          type: string
+        artist:
+          type: string
+        albumArtUrl:
+          type: ["string", "null"]
+        spotifyTrackId:
+          type: ["string", "null"]
+        previewUrl:
+          type: ["string", "null"]
+        meaning:
+          type: ["string", "null"]
+          description: Brief lyricslens-derived meaning summary
+        releaseYear:
+          type: ["integer", "null"]
+      required:
+        - title
+        - artist
+        - albumArtUrl
+
+    ResultInput:
+      type: object
+      properties:
+        playerId:
+          type: string
+          description: Client-generated anonymous UUID
+        displayName:
+          type: string
+        cluesUsed:
+          type: integer
+          minimum: 1
+          maximum: 5
+        won:
+          type: boolean
+        solveTimeMs:
+          type: ["integer", "null"]
+          description: Time from first load to result submission
+        clerkUserId:
+          type: ["string", "null"]
+          description: Clerk user ID if logged in, for persistent stats
+      required:
+        - playerId
+        - displayName
+        - cluesUsed
+        - won
+
+    ResultResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        streak:
+          type: ["integer", "null"]
+          description: Updated streak count after this result
+      required:
+        - ok
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        displayName:
+          type: string
+        cluesUsed:
+          type: integer
+        solveTimeMs:
+          type: ["integer", "null"]
+        won:
+          type: boolean
+      required:
+        - rank
+        - displayName
+        - cluesUsed
+        - won
+
+    PuzzleStats:
+      type: object
+      properties:
+        puzzleNumber:
+          type: integer
+        totalPlays:
+          type: integer
+        winCount:
+          type: integer
+        winRate:
+          type: number
+          description: 0.0 to 1.0
+        clueDistribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClueDistributionEntry"
+      required:
+        - puzzleNumber
+        - totalPlays
+        - winCount
+        - winRate
+        - clueDistribution
+
+    ClueDistributionEntry:
+      type: object
+      properties:
+        cluesUsed:
+          type: integer
+        count:
+          type: integer
+        won:
+          type: boolean
+      required:
+        - cluesUsed
+        - count
+        - won
+
+    PlayerStreak:
+      type: object
+      properties:
+        playerId:
+          type: string
+        currentStreak:
+          type: integer
+        maxStreak:
+          type: integer
+        lastPlayedDate:
+          type: ["string", "null"]
+          description: ISO date of last play
+        totalPlays:
+          type: integer
+        winCount:
+          type: integer
+      required:
+        - playerId
+        - currentStreak
+        - maxStreak
+        - totalPlays
+        - winCount
+
+    PlayerStats:
+      type: object
+      properties:
+        clerkUserId:
+          type: string
+        displayName:
+          type: ["string", "null"]
+        totalPlays:
+          type: integer
+        winCount:
+          type: integer
+        winRate:
+          type: number
+        currentStreak:
+          type: integer
+        maxStreak:
+          type: integer
+        lastPlayedDate:
+          type: ["string", "null"]
+        clueDistribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClueDistributionEntry"
+      required:
+        - clerkUserId
+        - totalPlays
+        - winCount
+        - winRate
+        - currentStreak
+        - maxStreak
+        - clueDistribution
