@@ -99,27 +99,33 @@ export default function ClueCard({ clue, index, revealed }: ClueCardProps) {
               )}
 
               {index === 4 && (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-5">
                   {clue.albumArtUrl && (
-                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border mx-auto shadow-2xl">
-                      <img src={clue.albumArtUrl} alt="Album Art" className="w-full h-full object-cover blur-sm opacity-50" />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <Music className="w-8 h-8 text-primary animate-pulse" />
+                    <div className="flex justify-center">
+                      <div className="relative w-40 h-40 rounded-xl overflow-hidden border border-border shadow-2xl ring-1 ring-white/10">
+                        <img
+                          src={clue.albumArtUrl}
+                          alt="Album Art"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                       </div>
                     </div>
                   )}
                   {clue.spotifyTrackId ? (
                     <iframe
-                      src={`https://open.spotify.com/embed/track/${clue.spotifyTrackId}`}
+                      src={`https://open.spotify.com/embed/track/${clue.spotifyTrackId}?utm_source=generator&theme=0`}
                       width="100%"
-                      height="80"
+                      height="152"
                       frameBorder="0"
                       allowTransparency={true}
-                      allow="encrypted-media"
-                      className="rounded-lg shadow-lg"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                      className="rounded-xl shadow-lg"
+                      style={{ colorScheme: "normal" }}
                     />
                   ) : clue.previewUrl ? (
-                    <audio controls className="w-full h-10 mt-2 opacity-80 contrast-125">
+                    <audio controls className="w-full mt-1 opacity-90">
                       <source src={clue.previewUrl} type="audio/mpeg" />
                       Your browser does not support the audio element.
                     </audio>

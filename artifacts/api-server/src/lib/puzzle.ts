@@ -284,15 +284,32 @@ async function buildClue3(puzzle: PuzzleCache): Promise<ClueData> {
   return { stage: 3, stageLabel: STAGE_LABELS[3], richsyncWords, richsyncDurationMs };
 }
 
+async function fetchSpotifyAlbumArt(trackId: string | null): Promise<string | null> {
+  if (!trackId) return null;
+  try {
+    const res = await fetch(
+      `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { thumbnail_url?: string };
+    return data.thumbnail_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function buildClue4(puzzle: PuzzleCache): Promise<ClueData> {
   // Curated fallback
   if (puzzle.curated) {
+    const spotifyTrackId = puzzle.curated.spotifyTrackId;
+    const albumArtUrl = await fetchSpotifyAlbumArt(spotifyTrackId);
     return {
       stage: 4,
       stageLabel: STAGE_LABELS[4],
       previewUrl: null,
-      albumArtUrl: null,
-      spotifyTrackId: puzzle.curated.spotifyTrackId,
+      albumArtUrl,
+      spotifyTrackId,
     };
   }
 
