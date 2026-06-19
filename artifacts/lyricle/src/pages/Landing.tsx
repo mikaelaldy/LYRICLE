@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useUser } from "@clerk/react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Music2, Headphones, Trophy, Zap, Calendar, Globe } from "lucide-react";
@@ -49,6 +51,45 @@ function WaveBar({ delay = 0, height = 24 }: { delay?: number; height?: number }
   );
 }
 
+function LandingHeader() {
+  const { user, isLoaded } = useUser();
+  const [, setLocation] = useLocation();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled ? "bg-card/50 backdrop-blur-md border-b border-border" : "bg-transparent"
+      }`}
+    >
+      <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <img src={`${basePath}/logo.svg`} alt="Lyricle" className="w-8 h-8" />
+          <span className="font-serif text-2xl font-black tracking-tight text-primary">LYRICLE</span>
+        </div>
+
+        {isLoaded && !user && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="font-sans font-semibold border-primary/40 text-foreground hover:border-primary hover:bg-primary/10 rounded-none"
+            onClick={() => setLocation("/sign-in")}
+            data-testid="landing-signin-button"
+          >
+            Sign In
+          </Button>
+        )}
+      </div>
+    </header>
+  );
+}
+
 export default function Landing() {
   const [, setLocation] = useLocation();
 
@@ -56,6 +97,7 @@ export default function Landing() {
 
   return (
     <div className="bg-background text-foreground overflow-x-hidden">
+      <LandingHeader />
 
       {/* ── HERO ── */}
       <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 text-center overflow-hidden">
