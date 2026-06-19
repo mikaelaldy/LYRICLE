@@ -12,9 +12,9 @@ const router: IRouter = Router();
 const FREE_PLAYS_PER_DAY = 3;
 const UNLOCK_COST_POINTS = 50;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
-/** Reset plays_today if more than 24 h have passed since plays_reset_at. */
+/** Return user stats, resetting playsToday if more than 24 h have passed. */
 async function getOrResetUserStats(userId: string) {
   const rows = await db
     .select()
@@ -37,6 +37,32 @@ async function getOrResetUserStats(userId: string) {
   }
 
   return stats;
+}
+
+/** Normalise a string for fuzzy answer matching. */
+function norm(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s*[\(\[].+?[\)\]]\s*/g, "")
+    .replace(/\bfeat\.?\s+.+/i, "")
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function guessIsCorrect(guess: string, trackName: string, artistName: string): boolean {
+  const g = norm(guess);
+  if (g.length < 2) return false;
+  const t = norm(trackName);
+  const a = norm(artistName);
+  return (
+    t === g ||
+    a === g ||
+    (g.length >= 3 && t.startsWith(g)) ||
+    (g.length >= 3 && a.startsWith(g)) ||
+    (g.length >= 4 && t.includes(g)) ||
+    (g.length >= 4 && a.includes(g))
+  );
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -160,7 +186,8 @@ router.post("/puzzles", async (req: Request, res): Promise<void> => {
 });
 
 // GET /puzzles/:id
-// Returns puzzle metadata + play-limit info for the authenticated user.
+// Returns puzzle metadata for the player — answer fields (trackName, artistName) are OMITTED.
+// Unauthenticated callers always receive playsRemaining: 0 so the play gate shows correctly.
 router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
   const { id } = req.params;
   const { userId } = getAuth(req);
@@ -179,8 +206,8 @@ router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
 
     const puzzle = rows[0];
 
-    // Play-limit info for authenticated users
-    let playsRemaining = FREE_PLAYS_PER_DAY;
+    // Unauthenticated users get playsRemaining: 0 — they must sign in to play.
+    let playsRemaining = 0;
     let userPoints = 0;
 
     if (userId) {
@@ -189,16 +216,15 @@ router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
         playsRemaining = Math.max(0, FREE_PLAYS_PER_DAY - stats.playsToday);
         userPoints = stats.points;
       } else {
-        // No stats row yet — first time, full plays available
+        // No stats row yet — first time player, full plays available.
         playsRemaining = FREE_PLAYS_PER_DAY;
       }
     }
 
+    // NOTE: trackName and artistName are intentionally excluded to prevent answer leakage.
     res.json({
       id: puzzle.id,
       trackId: puzzle.trackId,
-      trackName: puzzle.trackName,
-      artistName: puzzle.artistName,
       albumArt: puzzle.albumArt,
       personalClue: puzzle.personalClue,
       maskedLyricIndex: puzzle.maskedLyricIndex,
@@ -206,6 +232,7 @@ router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
       createdAt: puzzle.createdAt,
       playsRemaining,
       userPoints,
+      requiresAuth: !userId,
     });
   } catch (err) {
     logger.error({ err, id }, "Puzzle fetch error");
@@ -214,10 +241,15 @@ router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
 });
 
 // GET /puzzles/:id/media
-// Returns lyrics lines + iTunes preview URL + enhanced album art.
-// Fetched lazily so it doesn't block puzzle load.
-router.get("/puzzles/:id/media", async (req, res): Promise<void> => {
+// Returns lyrics + iTunes audio URL + enhanced album art for progressive reveal stages.
+router.get("/puzzles/:id/media", async (req: Request, res): Promise<void> => {
   const { id } = req.params;
+  const { userId } = getAuth(req);
+
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to play this puzzle" });
+    return;
+  }
 
   try {
     const rows = await db
@@ -233,7 +265,6 @@ router.get("/puzzles/:id/media", async (req, res): Promise<void> => {
 
     const puzzle = rows[0];
 
-    // Fetch lyrics and iTunes data in parallel
     const [lyricsData, itunesTrack] = await Promise.all([
       fetchLyrics(parseInt(puzzle.trackId, 10)).catch(() => null),
       lookupItunesTrack(puzzle.artistName, puzzle.trackName).catch(() => null),
@@ -262,17 +293,135 @@ router.get("/puzzles/:id/media", async (req, res): Promise<void> => {
   }
 });
 
+// POST /puzzles/:id/guess
+// Validates a single guess server-side without exposing the answer.
+// Returns { correct, isGameOver, finalReveal? } — finalReveal only included when game ends.
+router.post("/puzzles/:id/guess", async (req: Request, res): Promise<void> => {
+  const { id } = req.params;
+  const { userId } = getAuth(req);
+
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to play this puzzle" });
+    return;
+  }
+
+  const { artist, title, guessNumber } = req.body as {
+    artist: string;
+    title: string;
+    guessNumber: number; // 1-indexed; game ends when guessNumber >= MAX_GUESSES and not correct
+  };
+
+  if (!artist || !title || typeof guessNumber !== "number") {
+    res.status(400).json({ error: "Missing required fields: artist, title, guessNumber" });
+    return;
+  }
+
+  try {
+    const rows = await db
+      .select()
+      .from(customPuzzlesTable)
+      .where(eq(customPuzzlesTable.id, id))
+      .limit(1);
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Puzzle not found" });
+      return;
+    }
+
+    const puzzle = rows[0];
+    const MAX_GUESSES = 4;
+
+    const correct =
+      guessIsCorrect(artist, puzzle.trackName, puzzle.artistName) ||
+      guessIsCorrect(title, puzzle.trackName, puzzle.artistName);
+
+    const isGameOver = correct || guessNumber >= MAX_GUESSES;
+
+    res.json({
+      correct,
+      isGameOver,
+      // Only reveal the answer when the game is definitively over.
+      ...(isGameOver
+        ? { finalReveal: { trackName: puzzle.trackName, artistName: puzzle.artistName, albumArt: puzzle.albumArt } }
+        : {}),
+    });
+  } catch (err) {
+    logger.error({ err, id }, "Guess validation error");
+    res.status(500).json({ error: "Failed to validate guess" });
+  }
+});
+
+// POST /puzzles/:id/unlock
+// Spends 50 points to grant one extra play by decrementing playsToday.
+// Does NOT record a play or update puzzle stats — that happens via /play after the game completes.
+router.post("/puzzles/:id/unlock", async (req: Request, res): Promise<void> => {
+  const { id } = req.params;
+  const { userId } = getAuth(req);
+
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to unlock a play" });
+    return;
+  }
+
+  try {
+    const rows = await db
+      .select()
+      .from(customPuzzlesTable)
+      .where(eq(customPuzzlesTable.id, id))
+      .limit(1);
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Puzzle not found" });
+      return;
+    }
+
+    // Ensure stats row exists.
+    await db
+      .insert(userStatsTable)
+      .values({ userId, points: 0, puzzlesCreated: 0, puzzlesPlayed: 0, puzzlesWon: 0, playsToday: 0 })
+      .onConflictDoNothing();
+
+    const stats = await getOrResetUserStats(userId);
+    const currentPoints = stats?.points ?? 0;
+
+    if (currentPoints < UNLOCK_COST_POINTS) {
+      res.status(402).json({ error: "Not enough points to unlock a play", userPoints: currentPoints });
+      return;
+    }
+
+    // Deduct points and decrement playsToday to grant one more play slot.
+    await db
+      .update(userStatsTable)
+      .set({
+        points: sql`${userStatsTable.points} - ${UNLOCK_COST_POINTS}`,
+        playsToday: sql`GREATEST(0, ${userStatsTable.playsToday} - 1)`,
+      })
+      .where(eq(userStatsTable.userId, userId));
+
+    res.json({
+      ok: true,
+      playsRemaining: 1,
+      userPoints: currentPoints - UNLOCK_COST_POINTS,
+    });
+  } catch (err) {
+    logger.error({ err, id }, "Unlock error");
+    res.status(500).json({ error: "Failed to unlock play" });
+  }
+});
+
 // POST /puzzles/:id/play
-// Records a completed play, updates stats, and optionally unlocks a play with points.
+// Records a completed game (win or loss) and awards points.
+// Requires authentication — unauthenticated plays cannot be tracked.
 router.post("/puzzles/:id/play", async (req: Request, res): Promise<void> => {
   const { id } = req.params;
   const { userId } = getAuth(req);
 
-  const { won, stagesUsed, unlock = false } = req.body as {
-    won: boolean;
-    stagesUsed: number;
-    unlock?: boolean;
-  };
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to record your play" });
+    return;
+  }
+
+  const { won, stagesUsed } = req.body as { won: boolean; stagesUsed: number };
 
   if (typeof won !== "boolean" || typeof stagesUsed !== "number") {
     res.status(400).json({ error: "Missing required fields: won, stagesUsed" });
@@ -293,79 +442,59 @@ router.post("/puzzles/:id/play", async (req: Request, res): Promise<void> => {
 
     const puzzle = rows[0];
 
-    if (userId) {
-      // Ensure stats row exists
-      await db
-        .insert(userStatsTable)
-        .values({ userId, points: 0, puzzlesCreated: 0, puzzlesPlayed: 0, puzzlesWon: 0, playsToday: 0 })
-        .onConflictDoNothing();
+    // Ensure stats row exists.
+    await db
+      .insert(userStatsTable)
+      .values({ userId, points: 0, puzzlesCreated: 0, puzzlesPlayed: 0, puzzlesWon: 0, playsToday: 0 })
+      .onConflictDoNothing();
 
-      const stats = await getOrResetUserStats(userId);
-      const currentPlays = stats?.playsToday ?? 0;
+    const stats = await getOrResetUserStats(userId);
+    const currentPlays = stats?.playsToday ?? 0;
 
-      if (!unlock && currentPlays >= FREE_PLAYS_PER_DAY) {
-        res.status(429).json({
-          error: "Daily play limit reached",
-          playsRemaining: 0,
-          userPoints: stats?.points ?? 0,
-          unlockCost: UNLOCK_COST_POINTS,
-        });
-        return;
-      }
-
-      if (unlock) {
-        const currentPoints = stats?.points ?? 0;
-        if (currentPoints < UNLOCK_COST_POINTS) {
-          res.status(402).json({ error: "Not enough points to unlock a play", userPoints: currentPoints });
-          return;
-        }
-        // Deduct unlock cost
-        await db
-          .update(userStatsTable)
-          .set({ points: sql`${userStatsTable.points} - ${UNLOCK_COST_POINTS}` })
-          .where(eq(userStatsTable.userId, userId));
-      }
-
-      // Points earned: +20 for win, +5 per stage survived regardless
-      const pointsEarned = (won ? 20 : 0) + (5 * Math.max(0, stagesUsed - 1));
-
-      await db
-        .update(userStatsTable)
-        .set({
-          puzzlesPlayed: sql`${userStatsTable.puzzlesPlayed} + 1`,
-          puzzlesWon: sql`${userStatsTable.puzzlesWon} + ${won ? 1 : 0}`,
-          playsToday: sql`${userStatsTable.playsToday} + 1`,
-          points: sql`${userStatsTable.points} + ${pointsEarned}`,
-        })
-        .where(eq(userStatsTable.userId, userId));
-
-      // Give creator +2 points per play
-      if (puzzle.creatorId !== userId) {
-        await db
-          .insert(userStatsTable)
-          .values({ userId: puzzle.creatorId, points: 2, puzzlesCreated: 0, puzzlesPlayed: 0, puzzlesWon: 0, playsToday: 0 })
-          .onConflictDoUpdate({
-            target: userStatsTable.userId,
-            set: { points: sql`${userStatsTable.points} + 2` },
-          });
-      }
-
-      // Record the play
-      await db.insert(puzzlePlaysTable).values({
-        puzzleId: id,
-        playerId: userId,
-        won,
-        stagesUsed,
+    if (currentPlays >= FREE_PLAYS_PER_DAY) {
+      res.status(429).json({
+        error: "Daily play limit reached — use /unlock to spend points for an extra play",
+        playsRemaining: 0,
+        userPoints: stats?.points ?? 0,
+        unlockCost: UNLOCK_COST_POINTS,
       });
+      return;
     }
 
-    // Increment puzzle play count
+    // Points earned for the player: +20 for win, +5 per stage survived.
+    const pointsEarned = (won ? 20 : 0) + 5 * Math.max(0, stagesUsed - 1);
+
+    await db
+      .update(userStatsTable)
+      .set({
+        puzzlesPlayed: sql`${userStatsTable.puzzlesPlayed} + 1`,
+        puzzlesWon: sql`${userStatsTable.puzzlesWon} + ${won ? 1 : 0}`,
+        playsToday: sql`${userStatsTable.playsToday} + 1`,
+        points: sql`${userStatsTable.points} + ${pointsEarned}`,
+      })
+      .where(eq(userStatsTable.userId, userId));
+
+    // Creator earns +2 per play (skip if creator plays their own puzzle).
+    if (puzzle.creatorId !== userId) {
+      await db
+        .insert(userStatsTable)
+        .values({ userId: puzzle.creatorId, points: 2, puzzlesCreated: 0, puzzlesPlayed: 0, puzzlesWon: 0, playsToday: 0 })
+        .onConflictDoUpdate({
+          target: userStatsTable.userId,
+          set: { points: sql`${userStatsTable.points} + 2` },
+        });
+    }
+
+    // Record individual play row.
+    await db.insert(puzzlePlaysTable).values({ puzzleId: id, playerId: userId, won, stagesUsed });
+
+    // Increment puzzle play count.
     await db
       .update(customPuzzlesTable)
       .set({ playCount: sql`${customPuzzlesTable.playCount} + 1` })
       .where(eq(customPuzzlesTable.id, id));
 
-    res.json({ ok: true });
+    res.json({ ok: true, pointsEarned });
   } catch (err) {
     logger.error({ err, id }, "Play recording error");
     res.status(500).json({ error: "Failed to record play" });

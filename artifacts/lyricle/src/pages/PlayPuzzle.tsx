@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Music2, Headphones, FileText, Image, Star, Trophy, RotateCcw, Zap, Lock, ChevronRight } from "lucide-react";
+import { Music2, Headphones, FileText, Image, Trophy, RotateCcw, Zap, Lock, ChevronRight, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import GuessInput from "@/components/GuessInput";
@@ -20,14 +20,13 @@ function apiUrl(path: string) {
 interface PuzzleData {
   id: string;
   trackId: string;
-  trackName: string;
-  artistName: string;
   albumArt: string | null;
   personalClue: string;
   maskedLyricIndex: number;
   playCount: number;
   playsRemaining: number;
   userPoints: number;
+  requiresAuth: boolean;
 }
 
 interface MediaData {
@@ -36,51 +35,27 @@ interface MediaData {
   albumArt: string | null;
 }
 
-type GamePhase = "loading" | "error" | "gated" | "playing" | "won" | "lost";
+interface FinalReveal {
+  trackName: string;
+  artistName: string;
+  albumArt: string | null;
+}
+
+type GamePhase = "loading" | "error" | "auth-gate" | "play-gate" | "playing" | "won" | "lost";
 
 const STAGE_META = [
-  { icon: FileText, label: "Personal Clue", color: "text-blue-400" },
-  { icon: FileText, label: "Hidden Lyric", color: "text-purple-400" },
-  { icon: Image, label: "Album Art", color: "text-emerald-400" },
-  { icon: Headphones, label: "Audio Snippet", color: "text-primary" },
+  { icon: FileText, label: "Personal Clue" },
+  { icon: FileText, label: "Hidden Lyric" },
+  { icon: Image,    label: "Album Art"    },
+  { icon: Headphones, label: "Audio Snippet" },
 ];
 
 const MAX_GUESSES = 4;
 
-// ─── Guess checking ───────────────────────────────────────────────────────────
-
-function norm(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/\s*[\(\[].+?[\)\]]\s*/g, "")
-    .replace(/\bfeat\.?\s+.+/i, "")
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isCorrectGuess(guess: string, trackName: string, artistName: string): boolean {
-  const g = norm(guess);
-  if (g.length < 2) return false;
-  const t = norm(trackName);
-  const a = norm(artistName);
-  // Accept if guess substantially matches track title OR artist name
-  return (
-    t === g ||
-    a === g ||
-    (g.length >= 3 && t.startsWith(g)) ||
-    (g.length >= 3 && a.startsWith(g)) ||
-    (g.length >= 4 && t.includes(g)) ||
-    (g.length >= 4 && a.includes(g))
-  );
-}
-
-// ─── Animations ───────────────────────────────────────────────────────────────
-
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
+  exit:    { opacity: 0, y: -10, transition: { duration: 0.2 } },
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -101,74 +76,103 @@ export default function PlayPuzzle({ params }: Props) {
   const [mediaLoading, setMediaLoading] = useState(false);
   const [stage, setStage] = useState(0);
   const [guesses, setGuesses] = useState<string[]>([]);
+  const [answer, setAnswer] = useState<FinalReveal | null>(null);
   const [lastWrong, setLastWrong] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [guessing, setGuessing] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
 
-  // Load puzzle + media in parallel on mount
+  // Load puzzle on mount; load media separately once we know auth status.
   useEffect(() => {
-    if (!puzzleId) {
-      setPhase("error");
-      return;
-    }
+    if (!puzzleId) { setPhase("error"); return; }
 
     setPhase("loading");
-    setMediaLoading(true);
 
-    Promise.all([
-      fetch(apiUrl(`/puzzles/${puzzleId}`)).then((r) => r.json() as Promise<PuzzleData & { error?: string }>),
-      fetch(apiUrl(`/puzzles/${puzzleId}/media`)).then((r) => r.json() as Promise<MediaData & { error?: string }>),
-    ])
-      .then(([puzzleData, mediaData]) => {
-        if (puzzleData.error) {
-          setPhase("error");
+    fetch(apiUrl(`/puzzles/${puzzleId}`))
+      .then((r) => r.json() as Promise<PuzzleData & { error?: string }>)
+      .then((data) => {
+        if (data.error) { setPhase("error"); return; }
+        setPuzzle(data);
+
+        if (data.requiresAuth) {
+          setPhase("auth-gate");
           return;
         }
-        setPuzzle(puzzleData);
-        if (!mediaData.error) setMedia(mediaData);
-        setPhase(puzzleData.playsRemaining === 0 ? "gated" : "playing");
+        if (data.playsRemaining === 0) {
+          setPhase("play-gate");
+          return;
+        }
+
+        setPhase("playing");
+        // Fetch media in background once we know the user can play.
+        setMediaLoading(true);
+        fetch(apiUrl(`/puzzles/${puzzleId}/media`))
+          .then((r) => r.json() as Promise<MediaData & { error?: string }>)
+          .then((m) => { if (!m.error) setMedia(m); })
+          .catch(() => {/* media is optional — degrade gracefully */})
+          .finally(() => setMediaLoading(false));
       })
-      .catch(() => setPhase("error"))
-      .finally(() => setMediaLoading(false));
+      .catch(() => setPhase("error"));
   }, [puzzleId]);
 
   const handleGuess = useCallback(
     async (artist: string, title: string) => {
-      if (!puzzle || phase !== "playing") return;
+      if (!puzzle || phase !== "playing" || guessing) return;
 
       const guessText = `${artist} — ${title}`;
-      const correct = isCorrectGuess(artist, puzzle.artistName, puzzle.trackName) ||
-        isCorrectGuess(title, puzzle.trackName, puzzle.artistName);
+      const nextGuessNumber = guesses.length + 1;
 
-      const newGuesses = [...guesses, guessText];
-      setGuesses(newGuesses);
+      setGuessing(true);
+      try {
+        const res = await fetch(apiUrl(`/puzzles/${puzzle.id}/guess`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ artist, title, guessNumber: nextGuessNumber }),
+        });
 
-      if (correct) {
-        setPhase("won");
-        await recordPlay(true, stage + 1);
-        return;
-      }
+        if (!res.ok) {
+          const err = await res.json() as { error?: string };
+          toast({ title: "Error", description: err.error ?? "Failed to check guess.", variant: "destructive" });
+          return;
+        }
 
-      setLastWrong(true);
-      setTimeout(() => setLastWrong(false), 600);
+        const result = await res.json() as {
+          correct: boolean;
+          isGameOver: boolean;
+          finalReveal?: FinalReveal;
+        };
 
-      if (newGuesses.length >= MAX_GUESSES) {
-        setPhase("lost");
-        await recordPlay(false, MAX_GUESSES);
-        return;
-      }
+        const newGuesses = [...guesses, guessText];
+        setGuesses(newGuesses);
 
-      // Advance to next stage
-      if (stage < MAX_GUESSES - 1) {
-        setStage(stage + 1);
+        if (result.finalReveal) setAnswer(result.finalReveal);
+
+        if (result.correct) {
+          setPhase("won");
+          await recordPlay(true, newGuesses.length);
+          return;
+        }
+
+        if (result.isGameOver) {
+          setPhase("lost");
+          await recordPlay(false, MAX_GUESSES);
+          return;
+        }
+
+        // Wrong guess — shake and advance stage.
+        setLastWrong(true);
+        setTimeout(() => setLastWrong(false), 600);
+        if (stage < MAX_GUESSES - 1) setStage(stage + 1);
+      } catch {
+        toast({ title: "Network error", description: "Please check your connection.", variant: "destructive" });
+      } finally {
+        setGuessing(false);
       }
     },
-    [puzzle, phase, guesses, stage],
+    [puzzle, phase, guesses, stage, guessing],
   );
 
   async function recordPlay(won: boolean, stagesUsed: number) {
     if (!puzzle) return;
-    setSubmitting(true);
     try {
       await fetch(apiUrl(`/puzzles/${puzzle.id}/play`), {
         method: "POST",
@@ -176,17 +180,14 @@ export default function PlayPuzzle({ params }: Props) {
         body: JSON.stringify({ won, stagesUsed }),
       });
     } catch {
-      // Non-blocking — don't show error for stat recording failures
-    } finally {
-      setSubmitting(false);
+      // Non-blocking — stat recording failure doesn't interrupt the game result.
     }
   }
 
   async function handleUnlock() {
-    if (!puzzle || !user) {
-      setLocation("/sign-in");
-      return;
-    }
+    if (!puzzle) return;
+    if (!user) { setLocation("/sign-in"); return; }
+
     if ((puzzle.userPoints ?? 0) < 50) {
       toast({ title: "Not enough points", description: "You need 50 points to unlock a play.", variant: "destructive" });
       return;
@@ -194,16 +195,26 @@ export default function PlayPuzzle({ params }: Props) {
 
     setUnlocking(true);
     try {
-      const res = await fetch(apiUrl(`/puzzles/${puzzle.id}/play`), {
+      const res = await fetch(apiUrl(`/puzzles/${puzzle.id}/unlock`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ won: false, stagesUsed: 0, unlock: true }),
       });
+
       if (res.ok) {
-        setPuzzle((p) => p ? { ...p, playsRemaining: 1, userPoints: (p.userPoints ?? 0) - 50 } : p);
+        const data = await res.json() as { playsRemaining: number; userPoints: number };
+        setPuzzle((p) => p ? { ...p, playsRemaining: data.playsRemaining, userPoints: data.userPoints } : p);
         setPhase("playing");
         setStage(0);
         setGuesses([]);
+        setAnswer(null);
+
+        // Load media now that unlock succeeded.
+        setMediaLoading(true);
+        fetch(apiUrl(`/puzzles/${puzzle.id}/media`))
+          .then((r) => r.json() as Promise<MediaData & { error?: string }>)
+          .then((m) => { if (!m.error) setMedia(m); })
+          .catch(() => {})
+          .finally(() => setMediaLoading(false));
       } else {
         const err = await res.json() as { error?: string };
         toast({ title: "Unlock failed", description: err.error ?? "Please try again.", variant: "destructive" });
@@ -243,7 +254,46 @@ export default function PlayPuzzle({ params }: Props) {
     );
   }
 
-  if (phase === "gated") {
+  // User not signed in at all — require sign-in before play.
+  if (phase === "auth-gate") {
+    return (
+      <>
+        <Header />
+        <div className="max-w-md mx-auto px-4 py-16 text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <LogIn className="w-8 h-8 text-primary" />
+          </div>
+          <h2 className="font-serif text-2xl font-black">Sign in to play</h2>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Create a free account to play custom Lyricle puzzles, earn points, and see the leaderboard.
+          </p>
+
+          {/* Teaser: show only the clue, gated */}
+          <div className="bg-card border border-border rounded-xl p-5 text-left">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> Creator's clue
+            </p>
+            <p className="text-base text-foreground italic leading-relaxed">"{puzzle.personalClue}"</p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button className="gap-2 h-12" onClick={() => setLocation("/sign-in")}>
+              <LogIn className="w-4 h-4" /> Sign in to play
+            </Button>
+            <Button variant="outline" onClick={() => setLocation("/sign-up")}>
+              Create a free account
+            </Button>
+            <Button variant="ghost" className="text-muted-foreground" onClick={() => setLocation("/")}>
+              Back to home
+            </Button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Signed in but out of plays for today.
+  if (phase === "play-gate") {
     return (
       <>
         <Header />
@@ -253,41 +303,33 @@ export default function PlayPuzzle({ params }: Props) {
           </div>
           <h2 className="font-serif text-2xl font-black">Daily limit reached</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Free players get <strong>3 puzzle plays per day</strong>. Come back tomorrow, or spend <strong>50 points</strong> to unlock one more play right now.
+            Free players get <strong>3 puzzle plays per day</strong>. Come back tomorrow, or spend{" "}
+            <strong>50 points</strong> to unlock one more play right now.
           </p>
 
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex justify-between text-sm mb-1">
+          <div className="bg-card border border-border rounded-xl p-4 text-sm">
+            <div className="flex justify-between mb-1">
               <span className="text-muted-foreground">Your points</span>
-              <span className="font-bold text-primary flex items-center gap-1">
-                <Star className="w-3.5 h-3.5" />
-                {puzzle.userPoints ?? 0}
-              </span>
+              <span className="font-bold text-primary">{puzzle.userPoints ?? 0} pts</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Unlock cost</span>
-              <span className="font-medium">50 points</span>
+              <span className="font-medium">50 pts</span>
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            {user ? (
-              <Button
-                className="gap-2 h-12"
-                disabled={unlocking || (puzzle.userPoints ?? 0) < 50}
-                onClick={handleUnlock}
-              >
-                {unlocking ? (
-                  <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Unlocking…</>
-                ) : (
-                  <><Zap className="w-4 h-4" /> Spend 50 points to play</>
-                )}
-              </Button>
-            ) : (
-              <Button className="gap-2 h-12" onClick={() => setLocation("/sign-in")}>
-                Sign in to use your points
-              </Button>
-            )}
+            <Button
+              className="gap-2 h-12"
+              disabled={unlocking || (puzzle.userPoints ?? 0) < 50}
+              onClick={handleUnlock}
+            >
+              {unlocking ? (
+                <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Unlocking…</>
+              ) : (
+                <><Zap className="w-4 h-4" /> Spend 50 points to play</>
+              )}
+            </Button>
             <Button variant="outline" onClick={() => setLocation("/")}>Back to home</Button>
           </div>
         </div>
@@ -298,6 +340,7 @@ export default function PlayPuzzle({ params }: Props) {
   if (phase === "won" || phase === "lost") {
     const stagesUsed = guesses.length;
     const pointsEarned = phase === "won" ? 20 + 5 * Math.max(0, stagesUsed - 1) : 0;
+    const revealArt = answer?.albumArt ?? media?.albumArt ?? puzzle.albumArt;
 
     return (
       <>
@@ -328,20 +371,22 @@ export default function PlayPuzzle({ params }: Props) {
 
           {/* Song reveal */}
           <div className="flex items-center gap-4 bg-card border border-border rounded-xl p-4">
-            {(media?.albumArt || puzzle.albumArt) ? (
-              <img
-                src={media?.albumArt ?? puzzle.albumArt ?? ""}
-                alt=""
-                className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-              />
+            {revealArt ? (
+              <img src={revealArt} alt="" className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
             ) : (
               <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                 <Music2 className="w-7 h-7 text-muted-foreground" />
               </div>
             )}
             <div className="min-w-0">
-              <div className="font-bold text-foreground truncate text-lg">{puzzle.trackName}</div>
-              <div className="text-sm text-muted-foreground truncate">{puzzle.artistName}</div>
+              {answer ? (
+                <>
+                  <div className="font-bold text-foreground truncate text-lg">{answer.trackName}</div>
+                  <div className="text-sm text-muted-foreground truncate">{answer.artistName}</div>
+                </>
+              ) : (
+                <div className="text-muted-foreground text-sm italic">Song details unavailable</div>
+              )}
             </div>
           </div>
 
@@ -350,17 +395,20 @@ export default function PlayPuzzle({ params }: Props) {
             "{puzzle.personalClue}"
           </div>
 
-          {/* Guesses */}
+          {/* Guesses recap */}
           {guesses.length > 0 && (
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Your guesses</p>
               {guesses.map((g, i) => (
-                <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-                  i === guesses.length - 1 && phase === "won"
-                    ? "bg-primary/15 text-primary font-medium"
-                    : "bg-card text-muted-foreground line-through opacity-60"
-                }`}>
-                  <span>{g}</span>
+                <div
+                  key={i}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+                    i === guesses.length - 1 && phase === "won"
+                      ? "bg-primary/15 text-primary font-medium"
+                      : "bg-card text-muted-foreground line-through opacity-60"
+                  }`}
+                >
+                  {g}
                 </div>
               ))}
             </div>
@@ -391,20 +439,14 @@ export default function PlayPuzzle({ params }: Props) {
       <Header />
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-        {/* Stage indicator */}
+        {/* Stage progress */}
         <div className="flex items-center gap-1">
           {STAGE_META.map((s, i) => {
             const Icon = s.icon;
             return (
               <div key={i} className="flex items-center gap-1 flex-1">
-                <div
-                  className={`flex flex-col items-center ${i === stage ? "opacity-100" : i < stage ? "opacity-60" : "opacity-25"}`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      i < stage ? "bg-primary/20" : i === stage ? "bg-primary/20 ring-2 ring-primary" : "bg-muted"
-                    }`}
-                  >
+                <div className={`flex flex-col items-center ${i === stage ? "opacity-100" : i < stage ? "opacity-60" : "opacity-25"}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${i < stage ? "bg-primary/20" : i === stage ? "bg-primary/20 ring-2 ring-primary" : "bg-muted"}`}>
                     <Icon className={`w-4 h-4 ${i <= stage ? "text-primary" : "text-muted-foreground"}`} />
                   </div>
                   <span className={`text-[10px] mt-1 hidden sm:block font-medium ${i === stage ? "text-primary" : "text-muted-foreground"}`}>
@@ -419,32 +461,27 @@ export default function PlayPuzzle({ params }: Props) {
           })}
         </div>
 
-        {/* Guesses used */}
+        {/* Guesses remaining */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{MAX_GUESSES - guesses.length} guess{MAX_GUESSES - guesses.length !== 1 ? "es" : ""} remaining</span>
           <div className="flex gap-1">
             {Array.from({ length: MAX_GUESSES }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-2 h-2 rounded-full ${i < guesses.length ? "bg-destructive/70" : "bg-muted"}`}
-              />
+              <div key={i} className={`w-2 h-2 rounded-full ${i < guesses.length ? "bg-destructive/70" : "bg-muted"}`} />
             ))}
           </div>
         </div>
 
-        {/* Stage content */}
+        {/* Stage content panels — stacked as more are revealed */}
         <AnimatePresence mode="wait">
           <motion.div key={stage} {...fadeUp} className="space-y-4">
 
-            {/* Stage 0 – Personal Clue */}
-            {stage >= 0 && (
-              <div className="bg-card border border-border rounded-xl p-5">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" /> Creator's clue
-                </p>
-                <p className="text-lg text-foreground italic leading-relaxed">"{puzzle.personalClue}"</p>
-              </div>
-            )}
+            {/* Stage 0 – Personal Clue (always visible once playing) */}
+            <div className="bg-card border border-border rounded-xl p-5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Creator's clue
+              </p>
+              <p className="text-lg text-foreground italic leading-relaxed">"{puzzle.personalClue}"</p>
+            </div>
 
             {/* Stage 1 – Masked Lyrics */}
             {stage >= 1 && (
@@ -524,7 +561,7 @@ export default function PlayPuzzle({ params }: Props) {
           animate={lastWrong ? { x: [-8, 8, -6, 6, 0] } : { x: 0 }}
           transition={{ duration: 0.35 }}
         >
-          <GuessInput onGuess={handleGuess} disabled={phase !== "playing"} />
+          <GuessInput onGuess={handleGuess} disabled={phase !== "playing" || guessing} />
         </motion.div>
 
         <p className="text-center text-xs text-muted-foreground">
