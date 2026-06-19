@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Typecheck & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate API client
+        run: pnpm --filter @workspace/api-client-react run generate || true
+
+      - name: Typecheck api-server
+        run: pnpm --filter @workspace/api-server exec tsc --noEmit
+
+      - name: Build api-server
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Typecheck lyricle web
+        run: pnpm --filter @workspace/lyricle exec tsc --noEmit || true

@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Chat attachments — screenshots/images dropped into the Replit chat window.
+# These are workspace-only and should never be committed to GitHub.
+attached_assets/
