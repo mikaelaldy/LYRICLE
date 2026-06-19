@@ -92,6 +92,7 @@ interface PuzzleCache {
   track: MxmTrack | null;
   curated: CuratedSong | null;
   albumArtUrl: string | null;
+  previewUrl: string | null;
   clues: Partial<Record<number, ClueData>>;
 }
 
@@ -163,19 +164,24 @@ export async function getPuzzleCache(): Promise<PuzzleCache | null> {
   const { track, curated } = await loadTodayTrack();
   if (!track && !curated) return null;
 
-  // Resolve album art — check disk first so a cold-start oEmbed failure
+  // Resolve album art + preview URL — check disk first so a cold-start failure
   // never leaves Stage 4 without art.
   let albumArtUrl: string | null = await readDiskCache(today);
+  let previewUrl: string | null = null;
 
   if (albumArtUrl) {
     logger.info("Album art loaded from disk cache — skipping oEmbed round-trip");
   } else {
-    if (curated?.spotifyTrackId) {
-      albumArtUrl = await fetchSpotifyAlbumArt(curated.spotifyTrackId);
-    } else if (track) {
+    const spotifyId = curated?.spotifyTrackId ?? track?.track_spotify_id ?? null;
+    if (spotifyId) {
+      const spotifyData = await fetchSpotifyData(spotifyId);
+      albumArtUrl = spotifyData.albumArtUrl;
+      previewUrl = spotifyData.previewUrl;
+    }
+    if (!albumArtUrl && track) {
       albumArtUrl = track.album_coverart_800x800 || track.album_coverart_100x100 || null;
     }
-    // Persist so the next cold start can skip the fetch.
+    // Persist album art so the next cold start can skip the fetch.
     await writeDiskCache(today, albumArtUrl);
   }
 
@@ -185,6 +191,7 @@ export async function getPuzzleCache(): Promise<PuzzleCache | null> {
     track,
     curated,
     albumArtUrl,
+    previewUrl,
     clues: {},
   };
   return cache;
@@ -349,28 +356,54 @@ async function buildClue3(puzzle: PuzzleCache): Promise<ClueData> {
   return { stage: 3, stageLabel: STAGE_LABELS[3], richsyncWords, richsyncDurationMs };
 }
 
-async function fetchSpotifyAlbumArt(trackId: string | null): Promise<string | null> {
-  if (!trackId) return null;
+async function fetchSpotifyData(trackId: string | null): Promise<{ albumArtUrl: string | null; previewUrl: string | null }> {
+  if (!trackId) return { albumArtUrl: null, previewUrl: null };
+  let albumArtUrl: string | null = null;
+  let previewUrl: string | null = null;
   try {
-    const res = await fetch(
+    const oembedRes = await fetch(
       `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`,
       { signal: AbortSignal.timeout(5000) },
     );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { thumbnail_url?: string };
-    return data.thumbnail_url ?? null;
-  } catch {
-    return null;
-  }
+    if (oembedRes.ok) {
+      const data = (await oembedRes.json()) as { thumbnail_url?: string };
+      albumArtUrl = data.thumbnail_url ?? null;
+    }
+  } catch {}
+
+  try {
+    const embedRes = await fetch(
+      `https://open.spotify.com/embed/track/${trackId}`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+          "Accept": "text/html",
+        },
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (embedRes.ok) {
+      const html = await embedRes.text();
+      const cdnMatch = html.match(/https:\\u002Fp\.scdn\.co\\u002Fmp3-preview\\u002F[a-f0-9]+/);
+      if (cdnMatch?.[0]) {
+        previewUrl = cdnMatch[0].replace(/\\u002F/g, "/");
+      } else {
+        const plainMatch = html.match(/https:\/\/p\.scdn\.co\/mp3-preview\/[a-f0-9]+/);
+        previewUrl = plainMatch?.[0] ?? null;
+      }
+    }
+  } catch {}
+
+  return { albumArtUrl, previewUrl };
 }
 
 async function buildClue4(puzzle: PuzzleCache): Promise<ClueData> {
-  // albumArtUrl is pre-warmed during puzzle initialisation — no live oEmbed call needed
+  // albumArtUrl and previewUrl are pre-warmed during puzzle initialisation
   if (puzzle.curated) {
     return {
       stage: 4,
       stageLabel: STAGE_LABELS[4],
-      previewUrl: null,
+      previewUrl: puzzle.previewUrl,
       albumArtUrl: puzzle.albumArtUrl,
       spotifyTrackId: puzzle.curated.spotifyTrackId,
     };
@@ -382,7 +415,7 @@ async function buildClue4(puzzle: PuzzleCache): Promise<ClueData> {
   return {
     stage: 4,
     stageLabel: STAGE_LABELS[4],
-    previewUrl: null,
+    previewUrl: puzzle.previewUrl,
     albumArtUrl: puzzle.albumArtUrl,
     spotifyTrackId: track.track_spotify_id || null,
   };

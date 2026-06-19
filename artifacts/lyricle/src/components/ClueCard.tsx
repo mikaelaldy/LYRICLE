@@ -3,6 +3,7 @@ import { RichsyncWord } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Music, Languages, FileText, Type, Volume2 } from "lucide-react";
+import AudioPlayer from "@/components/AudioPlayer";
 
 interface ClueCardProps {
   clue: PuzzleClue;
@@ -112,23 +113,8 @@ export default function ClueCard({ clue, index, revealed }: ClueCardProps) {
                       </div>
                     </div>
                   )}
-                  {clue.spotifyTrackId ? (
-                    <iframe
-                      src={`https://open.spotify.com/embed/track/${clue.spotifyTrackId}?utm_source=generator&theme=0`}
-                      width="100%"
-                      height="152"
-                      frameBorder="0"
-                      allowTransparency={true}
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      loading="lazy"
-                      className="rounded-xl shadow-lg"
-                      style={{ colorScheme: "normal" }}
-                    />
-                  ) : clue.previewUrl ? (
-                    <audio controls className="w-full mt-1 opacity-90">
-                      <source src={clue.previewUrl} type="audio/mpeg" />
-                      Your browser does not support the audio element.
-                    </audio>
+                  {clue.previewUrl ? (
+                    <AudioPlayer src={clue.previewUrl} />
                   ) : (
                     <div className="text-center p-4 border border-dashed border-border rounded-lg bg-black/20 text-muted-foreground italic">
                       🎵 Audio unlocked! Use your ears.
