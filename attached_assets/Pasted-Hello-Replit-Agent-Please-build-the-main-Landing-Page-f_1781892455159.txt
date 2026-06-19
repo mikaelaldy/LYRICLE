@@ -1,0 +1,50 @@
+Hello Replit Agent! Please build the main Landing Page (`/`) for Lyricle. It needs to be a highly converting, modern marketing page that follows the **Musixmatch Design System** we established earlier (Inter font, off-white background, highly rounded pill shapes, and soft shadows). 
+
+Please structure the landing page using the following sections and exact English copy:
+
+### 1. HERO SECTION
+*Layout: Split layout. Left side has text, right side has a visual mockup of a puzzle being played or created.*
+- **Headline:** Send a secret message through a song.
+- **Subheadline:** Create your own personalized music puzzle. Pick a song, hide a lyric, and challenge your friends to guess it. Completely free to play.
+- **Primary CTA Button:** `[ Create Your First Puzzle 🎵 ]` *(Pill-shaped, solid black bg, white text, hover scale effect)*
+- **Secondary CTA Button:** `[ View Leaderboard 🏆 ]` *(Pill-shaped, transparent bg, subtle border)*
+
+### 2. TRUST / PARTNER BAR
+*Layout: A full-width subtle strip right below the Hero section.*
+- **Small Text:** Powered by global music data:
+- **Logos/Text:** Musixmatch Pro, Songstats, JamBase *(Make these monochrome/gray to keep the UI clean)*
+
+### 3. HOW IT WORKS
+*Layout: A 3-step grid or vertical timeline with accompanying icons.*
+- **Section Title:** How to Play Lyricle
+- **Step 1: Pick a Song & Write a Clue 🔍**
+  - Search for any song from Musixmatch's database. Write a personal clue explaining why this song matters to you.
+- **Step 2: Mask the Lyrics ✂️**
+  - We'll pull the official lyrics. Your job is to select one specific line to block out from the player.
+- **Step 3: Share & Challenge 🚀**
+  - Send your unique link to your group chat or crush. See who can guess the hidden lyric the fastest!
+
+### 4. FEATURES & BENEFITS
+*Layout: A 3-column card grid. Use large border radii (`rounded-2xl`) and soft shadows for the cards.*
+- **Card 1: Earn Points & Climb the Ranks 📈**
+  - Every correct guess and every puzzle you create earns you points. Prove your elite music taste on the global leaderboard.
+- **Card 2: Catch Them Live 🎫**
+  - Finished a puzzle? We'll instantly show you if that artist is touring near your city (Powered by JamBase).
+- **Card 3: Discover Global Trivia 🌍**
+  - See real-time streaming stats and TikTok popularity for every song you play (Powered by Songstats).
+
+### 5. FINAL CTA
+*Layout: A centered block at the bottom of the page before the footer, with a slightly darker off-white background to stand out.*
+- **Headline:** Ready to test your friends' music knowledge?
+- **Subtext:** No credit card required. Build your first custom puzzle in under 30 seconds.
+- **Button:** `[ Start Creating Now ]`
+
+### 6. FOOTER
+*Layout: Simple and minimal.*
+- **Left:** Lyricle Logo
+- **Middle:** Links (Home, Leaderboard, Create)
+- **Right / Bottom text:** Lyrics provided by Musixmatch Pro. Concert data by JamBase.
+
+**Action Item:** Please build this page component now. Ensure it is fully responsive for mobile devices, and remember to strictly apply the Musixmatch design tokens!
+
+***
