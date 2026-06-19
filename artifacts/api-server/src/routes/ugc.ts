@@ -294,8 +294,8 @@ router.get("/puzzles/:id/media", async (req: Request, res): Promise<void> => {
 });
 
 // POST /puzzles/:id/guess
-// Validates a single guess server-side without exposing the answer.
-// Returns { correct, isGameOver, finalReveal? } — finalReveal only included when game ends.
+// Validates a single guess server-side. Returns only {correct} — the answer is
+// NEVER revealed here; it is returned by POST /play once the game is recorded.
 router.post("/puzzles/:id/guess", async (req: Request, res): Promise<void> => {
   const { id } = req.params;
   const { userId } = getAuth(req);
@@ -305,14 +305,10 @@ router.post("/puzzles/:id/guess", async (req: Request, res): Promise<void> => {
     return;
   }
 
-  const { artist, title, guessNumber } = req.body as {
-    artist: string;
-    title: string;
-    guessNumber: number; // 1-indexed; game ends when guessNumber >= MAX_GUESSES and not correct
-  };
+  const { artist, title } = req.body as { artist: string; title: string };
 
-  if (!artist || !title || typeof guessNumber !== "number") {
-    res.status(400).json({ error: "Missing required fields: artist, title, guessNumber" });
+  if (typeof artist !== "string" || typeof title !== "string" || !artist.trim() || !title.trim()) {
+    res.status(400).json({ error: "Missing required fields: artist, title" });
     return;
   }
 
@@ -329,22 +325,14 @@ router.post("/puzzles/:id/guess", async (req: Request, res): Promise<void> => {
     }
 
     const puzzle = rows[0];
-    const MAX_GUESSES = 4;
 
     const correct =
       guessIsCorrect(artist, puzzle.trackName, puzzle.artistName) ||
       guessIsCorrect(title, puzzle.trackName, puzzle.artistName);
 
-    const isGameOver = correct || guessNumber >= MAX_GUESSES;
-
-    res.json({
-      correct,
-      isGameOver,
-      // Only reveal the answer when the game is definitively over.
-      ...(isGameOver
-        ? { finalReveal: { trackName: puzzle.trackName, artistName: puzzle.artistName, albumArt: puzzle.albumArt } }
-        : {}),
-    });
+    // Never include finalReveal here — client gets the answer only from POST /play
+    // once the game is recorded and the daily cap slot is consumed.
+    res.json({ correct });
   } catch (err) {
     logger.error({ err, id }, "Guess validation error");
     res.status(500).json({ error: "Failed to validate guess" });
@@ -428,6 +416,12 @@ router.post("/puzzles/:id/play", async (req: Request, res): Promise<void> => {
     return;
   }
 
+  // Clamp stagesUsed to [1, 4] to prevent unbounded points inflation.
+  if (!Number.isInteger(stagesUsed) || stagesUsed < 1 || stagesUsed > 4) {
+    res.status(400).json({ error: "stagesUsed must be an integer between 1 and 4" });
+    return;
+  }
+
   try {
     const rows = await db
       .select()
@@ -494,7 +488,17 @@ router.post("/puzzles/:id/play", async (req: Request, res): Promise<void> => {
       .set({ playCount: sql`${customPuzzlesTable.playCount} + 1` })
       .where(eq(customPuzzlesTable.id, id));
 
-    res.json({ ok: true, pointsEarned });
+    // Return the answer only after the play slot is consumed — this is the single
+    // authorised reveal point; /guess never returns the answer.
+    res.json({
+      ok: true,
+      pointsEarned,
+      finalReveal: {
+        trackName: puzzle.trackName,
+        artistName: puzzle.artistName,
+        albumArt: puzzle.albumArt,
+      },
+    });
   } catch (err) {
     logger.error({ err, id }, "Play recording error");
     res.status(500).json({ error: "Failed to record play" });

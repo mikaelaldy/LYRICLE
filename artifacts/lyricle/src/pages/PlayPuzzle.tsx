@@ -119,14 +119,15 @@ export default function PlayPuzzle({ params }: Props) {
       if (!puzzle || phase !== "playing" || guessing) return;
 
       const guessText = `${artist} — ${title}`;
-      const nextGuessNumber = guesses.length + 1;
+      const newGuesses = [...guesses, guessText];
+      const isLastGuess = newGuesses.length >= MAX_GUESSES;
 
       setGuessing(true);
       try {
         const res = await fetch(apiUrl(`/puzzles/${puzzle.id}/guess`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artist, title, guessNumber: nextGuessNumber }),
+          body: JSON.stringify({ artist, title }),
         });
 
         if (!res.ok) {
@@ -135,30 +136,30 @@ export default function PlayPuzzle({ params }: Props) {
           return;
         }
 
-        const result = await res.json() as {
-          correct: boolean;
-          isGameOver: boolean;
-          finalReveal?: FinalReveal;
-        };
+        const result = await res.json() as { correct: boolean };
 
-        const newGuesses = [...guesses, guessText];
         setGuesses(newGuesses);
 
-        if (result.finalReveal) setAnswer(result.finalReveal);
+        if (result.correct || isLastGuess) {
+          // Game over — record play server-side; answer comes back in /play response.
+          const won = result.correct;
+          const stagesUsed = Math.max(1, Math.min(4, newGuesses.length));
+          const playRes = await fetch(apiUrl(`/puzzles/${puzzle.id}/play`), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ won, stagesUsed }),
+          });
 
-        if (result.correct) {
-          setPhase("won");
-          await recordPlay(true, newGuesses.length);
+          if (playRes.ok) {
+            const playData = await playRes.json() as { finalReveal?: FinalReveal };
+            if (playData.finalReveal) setAnswer(playData.finalReveal);
+          }
+
+          setPhase(won ? "won" : "lost");
           return;
         }
 
-        if (result.isGameOver) {
-          setPhase("lost");
-          await recordPlay(false, MAX_GUESSES);
-          return;
-        }
-
-        // Wrong guess — shake and advance stage.
+        // Wrong guess, game continues — shake and advance to next stage.
         setLastWrong(true);
         setTimeout(() => setLastWrong(false), 600);
         if (stage < MAX_GUESSES - 1) setStage(stage + 1);
@@ -170,19 +171,6 @@ export default function PlayPuzzle({ params }: Props) {
     },
     [puzzle, phase, guesses, stage, guessing],
   );
-
-  async function recordPlay(won: boolean, stagesUsed: number) {
-    if (!puzzle) return;
-    try {
-      await fetch(apiUrl(`/puzzles/${puzzle.id}/play`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ won, stagesUsed }),
-      });
-    } catch {
-      // Non-blocking — stat recording failure doesn't interrupt the game result.
-    }
-  }
 
   async function handleUnlock() {
     if (!puzzle) return;
