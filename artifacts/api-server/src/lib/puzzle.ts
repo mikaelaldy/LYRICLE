@@ -115,29 +115,25 @@ interface PuzzleCache {
 export type ClueData = {
   stage: number;
   stageLabel: string;
-  // Stage 0
+  // Stage 0 — Personal Clue
+  personalNote?: string | null;
+  // Stage 1 — Vibes & Themes
   themes?: string[] | null;
   mood?: string | null;
-  // Stage 1
-  translatedLine?: string | null;
-  translationLanguage?: string | null;
-  translationLanguageCode?: string | null;
-  // Stage 2
+  // Stage 2 — Lyric Snippet
   snippet?: string | null;
-  // Stage 3
-  richsyncWords?: Array<{ word: string; startMs: number; endMs: number }> | null;
-  richsyncDurationMs?: number | null;
-  // Stage 4
-  previewUrl?: string | null;
+  // Stage 3 — Album Art
   albumArtUrl?: string | null;
+  // Stage 4 — Audio Preview
+  previewUrl?: string | null;
   spotifyTrackId?: string | null;
 };
 
 const STAGE_LABELS = [
+  "Personal Clue",
   "Vibes & Themes",
-  "Lost in Translation",
   "Lyric Snippet",
-  "Word by Word",
+  "Album Art",
   "Audio Preview",
 ];
 
@@ -297,18 +293,57 @@ export async function getPuzzleCache(): Promise<PuzzleCache | null> {
 // ─── Clue builders ────────────────────────────────────────────────────────────
 
 async function buildClue0(puzzle: PuzzleCache): Promise<ClueData> {
-  // Curated fallback
+  // Stage 0: Personal Clue — a lyric-based hint to open the puzzle.
+  // For curated songs: use the hand-crafted translated line (a cryptic lyric hint).
+  // For live MXM tracks: pick a line from ~60% through the lyrics (not the same
+  // line used by buildClue2 which takes the first/second line).
   if (puzzle.curated) {
     return {
       stage: 0,
       stageLabel: STAGE_LABELS[0],
+      personalNote: puzzle.curated.translatedLine,
+    };
+  }
+
+  const { track } = puzzle;
+  if (!track) return { stage: 0, stageLabel: STAGE_LABELS[0], personalNote: null };
+
+  let personalNote: string | null = null;
+
+  try {
+    const lyrics = await fetchLyrics(track.track_id);
+    if (lyrics?.lyrics_body) {
+      const lines = lyrics.lyrics_body
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 8 && !l.startsWith("*") && !l.toLowerCase().includes("lyrics is not for commercial"));
+      personalNote = lines[Math.floor(lines.length * 0.6)] ?? lines[0] ?? null;
+    }
+  } catch {}
+
+  if (!personalNote) {
+    try {
+      const snip = await fetchSnippet(track.track_id);
+      if (snip?.snippet_body) personalNote = snip.snippet_body;
+    } catch {}
+  }
+
+  return { stage: 0, stageLabel: STAGE_LABELS[0], personalNote };
+}
+
+async function buildClue1(puzzle: PuzzleCache): Promise<ClueData> {
+  // Stage 1: Vibes & Themes — mood label + theme keyword tags.
+  if (puzzle.curated) {
+    return {
+      stage: 1,
+      stageLabel: STAGE_LABELS[1],
       themes: puzzle.curated.themes,
       mood: puzzle.curated.mood,
     };
   }
 
   const { track } = puzzle;
-  if (!track) return { stage: 0, stageLabel: STAGE_LABELS[0], themes: ["mystery", "longing", "night"], mood: "Emotional" };
+  if (!track) return { stage: 1, stageLabel: STAGE_LABELS[1], themes: ["mystery", "longing", "night"], mood: "Emotional" };
 
   let themes: string[] | null = null;
   let mood: string | null = null;
@@ -321,19 +356,16 @@ async function buildClue0(puzzle: PuzzleCache): Promise<ClueData> {
     }
   } catch {}
 
-  // Lyricslens (403 on dev key) — derive themes from lyrics words + genre
   if (!themes) {
     try {
       const lyrics = await fetchLyrics(track.track_id);
       if (lyrics?.lyrics_body) {
-        // Extract meaningful content words (skip stop words)
         const stopWords = new Set(["that","this","with","have","from","they","will","been","were","your","what","when","their","there","then","than","just","like","into","over","also","more","some","such","only","same","other","each","most","which","these","those","about","after","would","could","should","every","never","always","because","before","little","still","where"]);
         const words = lyrics.lyrics_body
           .toLowerCase()
           .replace(/[^\w\s]/g, " ")
           .split(/\s+/)
           .filter((w) => w.length > 4 && !stopWords.has(w));
-        // Deduplicate and pick top words by frequency
         const freq: Record<string, number> = {};
         for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
         const topWords = Object.entries(freq)
@@ -345,7 +377,6 @@ async function buildClue0(puzzle: PuzzleCache): Promise<ClueData> {
     } catch {}
   }
 
-  // Derive mood from genre if available
   if (!mood && (track as any).primary_genres) {
     const genre = (track as unknown as { primary_genres?: { music_genre_list?: Array<{ music_genre: { music_genre_name: string } }> } })
       .primary_genres?.music_genre_list?.[0]?.music_genre?.music_genre_name;
@@ -359,69 +390,11 @@ async function buildClue0(puzzle: PuzzleCache): Promise<ClueData> {
     }
   }
 
-  // If we have at least some themes, return them; otherwise omit so the
-  // ClueCard renders a graceful "unavailable" state instead of nonsense.
-  return {
-    stage: 0,
-    stageLabel: STAGE_LABELS[0],
-    themes: themes ?? null,
-    mood: mood ?? null,
-  };
-}
-
-async function buildClue1(puzzle: PuzzleCache): Promise<ClueData> {
-  // Curated fallback — has hand-crafted translations
-  if (puzzle.curated) {
-    return {
-      stage: 1,
-      stageLabel: STAGE_LABELS[1],
-      translatedLine: puzzle.curated.translatedLine,
-      translationLanguage: puzzle.curated.translationLanguage,
-      translationLanguageCode: puzzle.curated.translationLanguageCode,
-    };
-  }
-
-  const { track, puzzleNumber } = puzzle;
-  if (!track) return { stage: 1, stageLabel: STAGE_LABELS[1], translatedLine: null, translationLanguage: null, translationLanguageCode: null };
-
-  const lang = pickTranslationLanguage(puzzleNumber);
-  let translatedLine: string | null = null;
-
-  // Try MXM translations (requires Pro tier — may be 403)
-  try {
-    const translations = await fetchTranslations(track.track_id);
-    const match = translations.find((t) => t.language === lang.code);
-    if (match?.description) translatedLine = match.description;
-  } catch {}
-
-  // Fallback: use MXM snippet as the "clue line" (snippet.get returns 200 on dev key)
-  if (!translatedLine) {
-    try {
-      const snippet = await fetchSnippet(track.track_id);
-      if (snippet?.snippet_body) translatedLine = snippet.snippet_body;
-    } catch {}
-  }
-
-  // Last resort: pick a line from the full lyrics
-  if (!translatedLine) {
-    try {
-      const lyrics = await fetchLyrics(track.track_id);
-      if (lyrics?.lyrics_body) {
-        const lines = lyrics.lyrics_body.split("\n").filter((l) => l.trim().length > 10);
-        translatedLine = lines[Math.floor(lines.length * 0.3)] ?? lines[0] ?? null;
-      }
-    } catch {}
-  }
-
-  // The dev-tier MXM key never returns real translations (always 403), so
-  // anything in translatedLine is an English snippet/lyric. Label it honestly
-  // as "Lyric hint" so players aren't misled into thinking it's a translation.
   return {
     stage: 1,
     stageLabel: STAGE_LABELS[1],
-    translatedLine,
-    translationLanguage: translatedLine ? "Lyric hint" : null,
-    translationLanguageCode: null,
+    themes: themes ?? null,
+    mood: mood ?? null,
   };
 }
 
@@ -459,41 +432,12 @@ async function buildClue2(puzzle: PuzzleCache): Promise<ClueData> {
 }
 
 async function buildClue3(puzzle: PuzzleCache): Promise<ClueData> {
-  // Curated fallback
-  if (puzzle.curated) {
-    const words = buildRichsyncWords(puzzle.curated.snippetWords);
-    return {
-      stage: 3,
-      stageLabel: STAGE_LABELS[3],
-      richsyncWords: words,
-      richsyncDurationMs: words.length > 0 ? words[words.length - 1].endMs - words[0].startMs + 500 : null,
-    };
-  }
-
-  const { track } = puzzle;
-  if (!track) return { stage: 3, stageLabel: STAGE_LABELS[3], richsyncWords: null, richsyncDurationMs: null };
-
-  let richsyncWords: ClueData["richsyncWords"] = null;
-  let richsyncDurationMs: number | null = null;
-
-  try {
-    const lines = await fetchRichsync(track.track_id);
-    if (lines && lines.length > 0) {
-      const midIdx = Math.floor(lines.length * 0.4);
-      const line = lines[midIdx];
-      if (line?.l?.length > 0) {
-        const durationMs = Math.round((line.te - line.ts) * 1000);
-        richsyncWords = line.l.map((w) => ({
-          word: w.c,
-          startMs: Math.round((line.ts + w.o) * 1000),
-          endMs: Math.round((line.ts + w.o) * 1000) + Math.max(300, Math.round(durationMs / line.l.length)),
-        }));
-        richsyncDurationMs = durationMs;
-      }
-    }
-  } catch {}
-
-  return { stage: 3, stageLabel: STAGE_LABELS[3], richsyncWords, richsyncDurationMs };
+  // Stage 3: Album Art — just the cover, pre-warmed during puzzle initialisation.
+  return {
+    stage: 3,
+    stageLabel: STAGE_LABELS[3],
+    albumArtUrl: puzzle.albumArtUrl,
+  };
 }
 
 async function fetchSpotifyData(trackId: string | null): Promise<{ albumArtUrl: string | null; previewUrl: string | null }> {
@@ -538,26 +482,22 @@ async function fetchSpotifyData(trackId: string | null): Promise<{ albumArtUrl: 
 }
 
 async function buildClue4(puzzle: PuzzleCache): Promise<ClueData> {
-  // albumArtUrl and previewUrl are pre-warmed during puzzle initialisation
+  // Stage 4: Audio Preview — audio only; album art was revealed at stage 3.
   if (puzzle.curated) {
     return {
       stage: 4,
       stageLabel: STAGE_LABELS[4],
       previewUrl: puzzle.previewUrl,
-      albumArtUrl: puzzle.albumArtUrl,
       spotifyTrackId: puzzle.curated.spotifyTrackId,
     };
   }
 
   const { track } = puzzle;
-  if (!track) return { stage: 4, stageLabel: STAGE_LABELS[4], previewUrl: null, albumArtUrl: null, spotifyTrackId: null };
-
   return {
     stage: 4,
     stageLabel: STAGE_LABELS[4],
     previewUrl: puzzle.previewUrl,
-    albumArtUrl: puzzle.albumArtUrl,
-    spotifyTrackId: track.track_spotify_id || null,
+    spotifyTrackId: track?.track_spotify_id || null,
   };
 }
 

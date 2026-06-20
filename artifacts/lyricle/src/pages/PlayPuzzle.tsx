@@ -22,7 +22,8 @@ interface PuzzleData {
   trackId: string;
   albumArt: string | null;
   personalClue: string;
-  maskedLyricIndex: number;
+  lyricSnippet: string | null;
+  songTheme: string | null;
   playCount: number;
   playsRemaining: number;
   userPoints: number;
@@ -78,13 +79,14 @@ function formatNumber(n: number): string {
 type GamePhase = "loading" | "error" | "auth-gate" | "play-gate" | "playing" | "won" | "lost";
 
 const STAGE_META = [
-  { icon: FileText, label: "Personal Clue" },
-  { icon: FileText, label: "Hidden Lyric" },
-  { icon: Image,    label: "Album Art"    },
-  { icon: Headphones, label: "Audio Snippet" },
+  { icon: FileText,   label: "Personal Clue"  },
+  { icon: Sparkles,   label: "Vibes & Themes" },
+  { icon: FileText,   label: "Lyric Snippet"  },
+  { icon: Image,      label: "Album Art"      },
+  { icon: Headphones, label: "Audio Preview"  },
 ];
 
-const MAX_GUESSES = 4;
+const MAX_GUESSES = 5;
 
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
@@ -207,7 +209,7 @@ export default function PlayPuzzle({ params }: Props) {
         if (result.correct || isLastGuess) {
           // Game over — record play server-side; answer comes back in /play response.
           const won = result.correct;
-          const stagesUsed = Math.max(1, Math.min(4, newGuesses.length));
+          const stagesUsed = Math.max(1, Math.min(5, newGuesses.length));
           const playRes = await fetch(apiUrl(`/puzzles/${puzzle.id}/play`), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -573,10 +575,13 @@ export default function PlayPuzzle({ params }: Props) {
 
   // ─── Playing phase ────────────────────────────────────────────────────────
 
-  const lyrics = media?.lyrics ?? [];
-  const maskedIdx = puzzle.maskedLyricIndex;
   const audioUrl = media?.audioPreviewUrl ?? null;
   const albumArt = media?.albumArt ?? puzzle.albumArt ?? null;
+  const parsedTheme = (() => {
+    if (!puzzle.songTheme) return null;
+    try { return JSON.parse(puzzle.songTheme) as { themes: string[]; mood: string | null }; }
+    catch { return null; }
+  })();
 
   return (
     <>
@@ -627,34 +632,53 @@ export default function PlayPuzzle({ params }: Props) {
               <p className="text-lg text-foreground italic leading-relaxed">"{puzzle.personalClue}"</p>
             </div>
 
-            {/* Stage 1 – Masked Lyrics */}
+            {/* Stage 1 – Vibes & Themes */}
             {stage >= 1 && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" /> Lyrics — one line hidden
+                  <Sparkles className="w-3.5 h-3.5" /> Vibes &amp; Themes
                 </p>
-                {mediaLoading || lyrics.length === 0 ? (
-                  <div className="text-muted-foreground text-sm italic">
-                    {mediaLoading ? "Loading lyrics…" : "Lyrics unavailable for this track."}
-                  </div>
-                ) : (
-                  <div className="space-y-0.5 font-mono text-sm leading-relaxed max-h-60 overflow-y-auto">
-                    {lyrics.map((line, i) =>
-                      i === maskedIdx ? (
-                        <div key={i} className="px-2 py-1 bg-primary/15 border border-primary/30 rounded text-primary font-semibold">
-                          [ ??? ]
-                        </div>
-                      ) : (
-                        <div key={i} className="px-2 py-0.5 text-muted-foreground">{line}</div>
-                      ),
+                {parsedTheme ? (
+                  <div className="space-y-3">
+                    {parsedTheme.themes.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {parsedTheme.themes.map((t: string) => (
+                          <span key={t} className="inline-flex items-center px-3 py-1 rounded-full bg-secondary/60 text-secondary-foreground text-sm font-medium">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {parsedTheme.mood && (
+                      <p className="text-lg font-serif italic text-muted-foreground">
+                        &ldquo;Feeling {parsedTheme.mood.toLowerCase()}...&rdquo;
+                      </p>
                     )}
                   </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Theme data unavailable for this puzzle.</p>
                 )}
               </div>
             )}
 
-            {/* Stage 2 – Album Art */}
+            {/* Stage 2 – Lyric Snippet */}
             {stage >= 2 && (
+              <div className="bg-card border border-border rounded-xl p-5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5" /> Lyric snippet
+                </p>
+                {puzzle.lyricSnippet ? (
+                  <blockquote className="border-l-4 border-primary/40 pl-4 py-1">
+                    <p className="font-mono text-base text-foreground leading-relaxed italic">"{puzzle.lyricSnippet}"</p>
+                  </blockquote>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No lyric snippet for this puzzle.</p>
+                )}
+              </div>
+            )}
+
+            {/* Stage 3 – Album Art */}
+            {stage >= 3 && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
                   <Image className="w-3.5 h-3.5" /> Album art
@@ -669,8 +693,8 @@ export default function PlayPuzzle({ params }: Props) {
               </div>
             )}
 
-            {/* Stage 3 – Audio Snippet */}
-            {stage >= 3 && (
+            {/* Stage 4 – Audio Preview */}
+            {stage >= 4 && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
                   <Headphones className="w-3.5 h-3.5" /> 30-second preview

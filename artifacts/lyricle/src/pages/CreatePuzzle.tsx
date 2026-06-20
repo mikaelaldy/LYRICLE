@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ArrowRight, ArrowLeft, Check, Copy, Music2, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Search, ArrowRight, ArrowLeft, Check, Copy, Music2, Sparkles, Badge as BadgeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -25,11 +26,17 @@ interface SelectedTrack extends TrackResult {
   lyrics?: string[];
 }
 
+interface SongTheme {
+  themes: string[];
+  mood: string | null;
+}
+
 const STEP_LABELS = [
   "Pick a Song",
-  "Write Your Clue",
-  "Choose a Line",
-  "Share It",
+  "Song Theme",
+  "Your Clue",
+  "Lyric Line",
+  "Share",
 ];
 
 const fadeIn = {
@@ -48,18 +55,17 @@ export default function CreatePuzzle() {
   const [results, setResults] = useState<TrackResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<SelectedTrack | null>(null);
+  const [songTheme, setSongTheme] = useState<SongTheme | null>(null);
+  const [loadingTheme, setLoadingTheme] = useState(false);
   const [personalClue, setPersonalClue] = useState("");
   const [lyrics, setLyrics] = useState<string[]>([]);
   const [loadingLyrics, setLoadingLyrics] = useState(false);
-  const [maskedIndex, setMaskedIndex] = useState<number | null>(null);
+  const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [puzzleId, setPuzzleId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auth guard is enforced at render time (not via useEffect) so the creation
-  // form never mounts for unauthenticated users — even for a single frame.
 
   useEffect(() => {
     if (!query || query.trim().length < 2) {
@@ -76,7 +82,7 @@ export default function CreatePuzzle() {
           setResults(data.tracks ?? []);
         }
       } catch {
-        // silently ignore network errors
+        // silently ignore
       } finally {
         setSearching(false);
       }
@@ -90,13 +96,27 @@ export default function CreatePuzzle() {
     setSelectedTrack(track);
     setResults([]);
     setQuery("");
+    setSongTheme(null);
     setStep(1);
+
+    setLoadingTheme(true);
+    try {
+      const res = await fetch(apiUrl(`/theme/${track.trackId}`));
+      if (res.ok) {
+        const data = await res.json() as SongTheme;
+        setSongTheme(data);
+      }
+    } catch {
+      // theme is optional — degrade gracefully
+    } finally {
+      setLoadingTheme(false);
+    }
   }
 
   async function goToLyrics() {
     if (!selectedTrack) return;
     setLoadingLyrics(true);
-    setStep(2);
+    setStep(3);
     try {
       const res = await fetch(apiUrl(`/lyrics/${selectedTrack.trackId}`));
       if (res.ok) {
@@ -104,18 +124,18 @@ export default function CreatePuzzle() {
         setLyrics(data.lines ?? []);
       } else {
         toast({ title: "Lyrics unavailable", description: "Couldn't load lyrics for this track.", variant: "destructive" });
-        setStep(1);
+        setStep(2);
       }
     } catch {
       toast({ title: "Network error", description: "Please check your connection and try again.", variant: "destructive" });
-      setStep(1);
+      setStep(2);
     } finally {
       setLoadingLyrics(false);
     }
   }
 
   async function savePuzzle() {
-    if (!selectedTrack || maskedIndex === null || !personalClue.trim()) return;
+    if (!selectedTrack || !selectedLine || !personalClue.trim()) return;
     setSaving(true);
     try {
       const res = await fetch(apiUrl("/puzzles"), {
@@ -127,13 +147,14 @@ export default function CreatePuzzle() {
           artistName: selectedTrack.artist,
           albumArt: selectedTrack.albumArt,
           personalClue: personalClue.trim(),
-          maskedLyricIndex: maskedIndex,
+          lyricSnippet: selectedLine,
+          songTheme: songTheme ? JSON.stringify(songTheme) : null,
         }),
       });
       if (res.ok) {
         const data = await res.json() as { puzzleId: string };
         setPuzzleId(data.puzzleId);
-        setStep(3);
+        setStep(4);
       } else {
         const err = await res.json() as { error?: string };
         toast({ title: "Failed to save", description: err.error ?? "Unknown error", variant: "destructive" });
@@ -154,7 +175,6 @@ export default function CreatePuzzle() {
     });
   }
 
-  // Render-time auth guard — never mount the creation form for guests.
   if (!isLoaded) {
     return (
       <div className="min-h-[calc(100dvh-64px)] flex items-center justify-center">
@@ -175,15 +195,9 @@ export default function CreatePuzzle() {
             Create a free account to build custom Lyricle puzzles and share them with friends.
           </p>
           <div className="flex flex-col gap-2">
-            <Button className="h-12 gap-2" onClick={() => setLocation("/sign-in")}>
-              Sign in
-            </Button>
-            <Button variant="outline" onClick={() => setLocation("/sign-up")}>
-              Create a free account
-            </Button>
-            <Button variant="ghost" className="text-muted-foreground" onClick={() => setLocation("/")}>
-              Back to home
-            </Button>
+            <Button className="h-12 gap-2" onClick={() => setLocation("/sign-in")}>Sign in</Button>
+            <Button variant="outline" onClick={() => setLocation("/sign-up")}>Create a free account</Button>
+            <Button variant="ghost" className="text-muted-foreground" onClick={() => setLocation("/")}>Back to home</Button>
           </div>
         </div>
       </div>
@@ -282,7 +296,7 @@ export default function CreatePuzzle() {
             </motion.div>
           )}
 
-          {/* Step 1: Personal clue */}
+          {/* Step 1: Song Theme (auto-generated, review) */}
           {step === 1 && selectedTrack && (
             <motion.div key="step1" {...fadeIn}>
               <div className="flex items-center gap-3 mb-6 p-4 bg-card border border-border rounded-xl">
@@ -306,8 +320,79 @@ export default function CreatePuzzle() {
               </div>
 
               <div className="space-y-2 mb-6">
+                <h1 className="font-serif text-3xl font-black text-foreground">Song theme</h1>
+                <p className="text-muted-foreground">
+                  This is auto-generated from the song's lyrics. Players see it as <strong>Stage 2</strong> — their second clue after yours.
+                </p>
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-5 space-y-4 min-h-[100px]">
+                {loadingTheme ? (
+                  <div className="flex items-center gap-3 text-muted-foreground text-sm">
+                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin flex-shrink-0" />
+                    Analyzing lyrics…
+                  </div>
+                ) : songTheme ? (
+                  <>
+                    {songTheme.themes.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {songTheme.themes.map((t) => (
+                          <Badge key={t} variant="secondary" className="bg-secondary/50 px-3 py-1 text-sm font-medium">
+                            #{t}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {songTheme.mood && (
+                      <p className="text-lg font-serif italic text-muted-foreground">
+                        &ldquo;Feeling {songTheme.mood.toLowerCase()}...&rdquo;
+                      </p>
+                    )}
+                    {songTheme.themes.length === 0 && !songTheme.mood && (
+                      <p className="text-sm text-muted-foreground italic">Theme analysis unavailable for this track — players will still see a themed stage.</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Theme unavailable — players will still see a themed stage.</p>
+                )}
+              </div>
+
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                This is auto-generated and cannot be edited.
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <Button variant="outline" onClick={() => setStep(0)} className="gap-2">
+                  <ArrowLeft className="w-4 h-4" /> Back
+                </Button>
+                <Button className="flex-1 gap-2" disabled={loadingTheme} onClick={() => setStep(2)}>
+                  Looks good! Continue <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 2: Personal clue */}
+          {step === 2 && selectedTrack && (
+            <motion.div key="step2" {...fadeIn}>
+              <div className="flex items-center gap-3 mb-6 p-4 bg-card border border-border rounded-xl">
+                {selectedTrack.albumArt ? (
+                  <img src={selectedTrack.albumArt} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <Music2 className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-bold text-foreground truncate">{selectedTrack.title}</div>
+                  <div className="text-sm text-muted-foreground truncate">{selectedTrack.artist}</div>
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-6">
                 <h1 className="font-serif text-3xl font-black text-foreground">Write your clue</h1>
-                <p className="text-muted-foreground">Share a personal memory or feeling tied to this song. This is Stage 1 — what players see first.</p>
+                <p className="text-muted-foreground">Share a personal memory or feeling tied to this song. This is <strong>Stage 1</strong> — the very first hint players see.</p>
               </div>
 
               <Textarea
@@ -329,7 +414,7 @@ export default function CreatePuzzle() {
               </div>
 
               <div className="flex gap-2 mt-6">
-                <Button variant="outline" onClick={() => setStep(0)} className="gap-2">
+                <Button variant="outline" onClick={() => setStep(1)} className="gap-2">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </Button>
                 <Button
@@ -343,12 +428,12 @@ export default function CreatePuzzle() {
             </motion.div>
           )}
 
-          {/* Step 2: Pick a lyric line to mask */}
-          {step === 2 && (
-            <motion.div key="step2" {...fadeIn}>
+          {/* Step 3: Choose a lyric line as snippet */}
+          {step === 3 && (
+            <motion.div key="step3" {...fadeIn}>
               <div className="space-y-2 mb-5">
-                <h1 className="font-serif text-3xl font-black text-foreground">Choose a line to hide</h1>
-                <p className="text-muted-foreground">Tap a lyric line. Players will see <span className="text-primary font-medium">[ ??? ]</span> in its place and must guess the song.</p>
+                <h1 className="font-serif text-3xl font-black text-foreground">Choose a lyric line</h1>
+                <p className="text-muted-foreground">Pick one line to reveal as <strong>Stage 3</strong>. Players see it as-is — a direct lyric clue to name the song.</p>
               </div>
 
               {loadingLyrics && (
@@ -364,30 +449,27 @@ export default function CreatePuzzle() {
                     {lyrics.map((line, i) => (
                       <button
                         key={i}
-                        onClick={() => setMaskedIndex(maskedIndex === i ? null : i)}
+                        onClick={() => setSelectedLine(selectedLine === line ? null : line)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all font-mono leading-relaxed ${
-                          maskedIndex === i
+                          selectedLine === line
                             ? "bg-primary text-primary-foreground font-semibold"
                             : "hover:bg-accent text-foreground"
                         }`}
                       >
-                        {maskedIndex === i ? (
+                        {selectedLine === line ? (
                           <span className="flex items-center gap-2">
-                            <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />
+                            <Check className="w-3.5 h-3.5 flex-shrink-0" />
                             {line}
-                            <span className="ml-auto text-xs opacity-75">masked</span>
+                            <span className="ml-auto text-xs opacity-75">selected</span>
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1">
-                            <Eye className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                            {line}
-                          </span>
+                          line
                         )}
                       </button>
                     ))}
                   </div>
 
-                  {maskedIndex !== null && (
+                  {selectedLine && (
                     <motion.div
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -395,18 +477,19 @@ export default function CreatePuzzle() {
                     >
                       <div className="flex items-center gap-2 text-sm">
                         <Sparkles className="w-4 h-4 text-primary" />
-                        <span className="text-primary font-medium">Players will see this as <code className="bg-primary/20 px-1 rounded">[ ??? ]</code></span>
+                        <span className="text-primary font-medium">Players will see this line as a direct clue</span>
                       </div>
+                      <p className="mt-2 font-mono text-sm text-foreground italic">"{selectedLine}"</p>
                     </motion.div>
                   )}
 
                   <div className="flex gap-2 mt-5">
-                    <Button variant="outline" onClick={() => setStep(1)} className="gap-2">
+                    <Button variant="outline" onClick={() => setStep(2)} className="gap-2">
                       <ArrowLeft className="w-4 h-4" /> Back
                     </Button>
                     <Button
                       className="flex-1 gap-2"
-                      disabled={maskedIndex === null || saving}
+                      disabled={!selectedLine || saving}
                       onClick={savePuzzle}
                     >
                       {saving ? (
@@ -422,7 +505,7 @@ export default function CreatePuzzle() {
               {!loadingLyrics && lyrics.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   <p>No lyrics found for this track.</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setStep(1)}>
+                  <Button variant="outline" className="mt-4" onClick={() => setStep(2)}>
                     Go back and pick another
                   </Button>
                 </div>
@@ -430,9 +513,9 @@ export default function CreatePuzzle() {
             </motion.div>
           )}
 
-          {/* Step 3: Share screen */}
-          {step === 3 && puzzleId && (
-            <motion.div key="step3" {...fadeIn}>
+          {/* Step 4: Share */}
+          {step === 4 && puzzleId && (
+            <motion.div key="step4" {...fadeIn}>
               <div className="text-center py-8">
                 <motion.div
                   initial={{ scale: 0 }}
@@ -483,9 +566,10 @@ export default function CreatePuzzle() {
                     onClick={() => {
                       setStep(0);
                       setSelectedTrack(null);
+                      setSongTheme(null);
                       setPersonalClue("");
                       setLyrics([]);
-                      setMaskedIndex(null);
+                      setSelectedLine(null);
                       setPuzzleId(null);
                       setQuery("");
                     }}

@@ -28,61 +28,46 @@ export interface RichsyncWord {
 
 /**
  * A single clue stage. Only the fields relevant to the stage are populated.
+ * Stage 0: Personal Clue  — personalNote
+ * Stage 1: Vibes & Themes — themes, mood
+ * Stage 2: Lyric Snippet  — snippet
+ * Stage 3: Album Art      — albumArtUrl
+ * Stage 4: Audio Preview  — previewUrl, spotifyTrackId
  */
 export interface PuzzleClue {
   stage: number;
   /** Human-readable stage name */
   stageLabel: string;
   /**
-     * Lyric theme keywords (stage 0)
+     * Personal note / lyric hint (stage 0)
+     * @nullable
+     */
+  personalNote?: string | null;
+  /**
+     * Lyric theme keywords (stage 1)
      * @nullable
      */
   themes?: string[] | null;
   /**
-     * Overall mood label (stage 0)
+     * Overall mood label (stage 1)
      * @nullable
      */
   mood?: string | null;
-  /**
-     * A lyric line translated into another language (stage 1)
-     * @nullable
-     */
-  translatedLine?: string | null;
-  /**
-     * Name of the language the line was translated into (stage 1)
-     * @nullable
-     */
-  translationLanguage?: string | null;
-  /**
-     * ISO language code (stage 1)
-     * @nullable
-     */
-  translationLanguageCode?: string | null;
   /**
      * Short lyric snippet (stage 2)
      * @nullable
      */
   snippet?: string | null;
   /**
-     * Word-level synced lyrics for a chorus line (stage 3)
-     * @nullable
-     */
-  richsyncWords?: RichsyncWord[] | null;
-  /**
-     * Total duration of the richsync segment in ms (stage 3)
-     * @nullable
-     */
-  richsyncDurationMs?: number | null;
-  /**
-     * 30-second Spotify preview URL (stage 4)
-     * @nullable
-     */
-  previewUrl?: string | null;
-  /**
-     * Album artwork URL (stage 4)
+     * Album artwork URL (stage 3)
      * @nullable
      */
   albumArtUrl?: string | null;
+  /**
+     * 30-second audio preview URL (stage 4)
+     * @nullable
+     */
+  previewUrl?: string | null;
   /**
      * Spotify track ID for embed (stage 4)
      * @nullable

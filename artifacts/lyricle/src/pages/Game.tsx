@@ -435,11 +435,11 @@ const TUTORIAL_STEPS = [
     content: (
       <div className="space-y-3">
         {[
-          { n: "01", label: "Creator's Clue", desc: "A personal note from whoever made this puzzle — why this song matters to them." },
-          { n: "02", label: "Mood & Themes", desc: "AI-analyzed emotions and themes from the lyrics. Abstract, but a real vibe." },
-          { n: "03", label: "Translated Lyric", desc: "One lyric line rendered in another language. A cryptic hint." },
-          { n: "04", label: "Lyrics Snippet", desc: "A direct excerpt from the song's official lyrics." },
-          { n: "05", label: "Audio + Art", desc: "A 30-second preview clip and the album cover. Almost too easy." },
+          { n: "01", label: "Personal Clue", desc: "A lyric-based hint — a line from the song to set the vibe." },
+          { n: "02", label: "Vibes & Themes", desc: "AI-analyzed mood and keyword themes pulled from the lyrics." },
+          { n: "03", label: "Lyric Snippet", desc: "A direct line from the song's official lyrics." },
+          { n: "04", label: "Album Art", desc: "The cover art for this release. Getting warmer." },
+          { n: "05", label: "Audio Preview", desc: "A 30-second clip. If you don't know by now, use your ears." },
         ].map(({ n, label, desc }) => (
           <div key={n} className="flex gap-3 items-start">
             <span className="font-mono text-primary font-bold text-sm mt-0.5 shrink-0">{n}</span>

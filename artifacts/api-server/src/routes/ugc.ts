@@ -3,7 +3,7 @@ import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { customPuzzlesTable, userStatsTable, puzzlePlaysTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { searchTracks, fetchLyrics } from "../lib/musixmatch";
+import { searchTracks, fetchLyrics, fetchSnippet, fetchLyricslens } from "../lib/musixmatch";
 import { lookupItunesTrack } from "../lib/itunes";
 import { logger } from "../lib/logger";
 
@@ -91,6 +91,57 @@ router.get("/search", async (req, res): Promise<void> => {
   }
 });
 
+// GET /theme/:trackId
+// Returns auto-generated mood + theme tags for a track. Used during puzzle creation.
+router.get("/theme/:trackId", async (req, res): Promise<void> => {
+  const trackId = parseInt(req.params.trackId, 10);
+  if (isNaN(trackId)) {
+    res.status(400).json({ error: "Invalid track ID" });
+    return;
+  }
+
+  let themes: string[] | null = null;
+  let mood: string | null = null;
+
+  try {
+    const lens = await fetchLyricslens(trackId);
+    if (lens) {
+      themes = lens.theme_clusters?.slice(0, 4).map((t) => t.label) ?? null;
+      mood = lens.mood_clusters?.[0]?.label ?? null;
+    }
+  } catch {}
+
+  if (!themes) {
+    try {
+      const lyrics = await fetchLyrics(trackId);
+      if (lyrics?.lyrics_body) {
+        const stopWords = new Set(["that","this","with","have","from","they","will","been","were","your","what","when","their","there","then","than","just","like","into","over","also","more","some","such","only","same","other","each","most","which","these","those","about","after","would","could","should","every","never","always","because","before","little","still","where"]);
+        const words = lyrics.lyrics_body
+          .toLowerCase()
+          .replace(/[^\w\s]/g, " ")
+          .split(/\s+/)
+          .filter((w) => w.length > 4 && !stopWords.has(w));
+        const freq: Record<string, number> = {};
+        for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
+        const topWords = Object.entries(freq)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(([w]) => w);
+        themes = topWords.length >= 2 ? topWords : null;
+      }
+    } catch {}
+  }
+
+  if (!themes) {
+    try {
+      const snip = await fetchSnippet(trackId);
+      if (snip?.snippet_body) themes = ["music"];
+    } catch {}
+  }
+
+  res.json({ themes: themes ?? [], mood });
+});
+
 // GET /lyrics/:trackId
 router.get("/lyrics/:trackId", async (req, res): Promise<void> => {
   const trackId = parseInt(req.params.trackId, 10);
@@ -131,16 +182,17 @@ router.post("/puzzles", async (req: Request, res): Promise<void> => {
     return;
   }
 
-  const { trackId, trackName, artistName, albumArt, personalClue, maskedLyricIndex } = req.body as {
+  const { trackId, trackName, artistName, albumArt, personalClue, lyricSnippet, songTheme } = req.body as {
     trackId: string | number;
     trackName: string;
     artistName: string;
     albumArt?: string | null;
     personalClue: string;
-    maskedLyricIndex: number;
+    lyricSnippet: string;
+    songTheme?: string | null;
   };
 
-  if (!trackId || !trackName || !artistName || !personalClue || maskedLyricIndex == null) {
+  if (!trackId || !trackName || !artistName || !personalClue || !lyricSnippet) {
     res.status(400).json({ error: "Missing required fields" });
     return;
   }
@@ -148,8 +200,8 @@ router.post("/puzzles", async (req: Request, res): Promise<void> => {
     res.status(400).json({ error: "Personal clue must be at least 10 characters" });
     return;
   }
-  if (typeof maskedLyricIndex !== "number" || maskedLyricIndex < 0) {
-    res.status(400).json({ error: "Invalid masked lyric index" });
+  if (typeof lyricSnippet !== "string" || lyricSnippet.trim().length < 2) {
+    res.status(400).json({ error: "Lyric snippet must be at least 2 characters" });
     return;
   }
 
@@ -162,7 +214,8 @@ router.post("/puzzles", async (req: Request, res): Promise<void> => {
         artistName: String(artistName),
         albumArt: albumArt || null,
         personalClue: personalClue.trim(),
-        maskedLyricIndex: Number(maskedLyricIndex),
+        lyricSnippet: lyricSnippet.trim(),
+        songTheme: songTheme ?? null,
         creatorId: userId,
       })
       .returning();
@@ -227,7 +280,8 @@ router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
       trackId: puzzle.trackId,
       albumArt: puzzle.albumArt,
       personalClue: puzzle.personalClue,
-      maskedLyricIndex: puzzle.maskedLyricIndex,
+      lyricSnippet: puzzle.lyricSnippet ?? null,
+      songTheme: puzzle.songTheme ?? null,
       playCount: puzzle.playCount,
       createdAt: puzzle.createdAt,
       playsRemaining,
@@ -416,9 +470,9 @@ router.post("/puzzles/:id/play", async (req: Request, res): Promise<void> => {
     return;
   }
 
-  // Clamp stagesUsed to [1, 4] to prevent unbounded points inflation.
-  if (!Number.isInteger(stagesUsed) || stagesUsed < 1 || stagesUsed > 4) {
-    res.status(400).json({ error: "stagesUsed must be an integer between 1 and 4" });
+  // Clamp stagesUsed to [1, 5] to prevent unbounded points inflation.
+  if (!Number.isInteger(stagesUsed) || stagesUsed < 1 || stagesUsed > 5) {
+    res.status(400).json({ error: "stagesUsed must be an integer between 1 and 5" });
     return;
   }
 
