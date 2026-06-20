@@ -229,7 +229,7 @@ export default function ResultModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-card border-border sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-3xl font-serif text-center mb-2">
+          <DialogTitle className="text-3xl font-serif text-center mb-2 text-balance">
             {state.won ? "Brilliant!" : "Next time..."}
           </DialogTitle>
           <DialogDescription className="text-center text-muted-foreground">
@@ -242,7 +242,7 @@ export default function ResultModal({
         {answer && (
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="w-48 h-48 rounded-xl overflow-hidden shadow-2xl border border-border">
-              <img src={answer.albumArtUrl || ""} alt={answer.title} className="w-full h-full object-cover" />
+              <img src={answer.albumArtUrl || ""} alt={answer.title} width={192} height={192} className="w-full h-full object-cover" />
             </div>
             <div className="text-center">
               <h3 className="text-2xl font-serif font-bold text-primary">{answer.title}</h3>
@@ -382,7 +382,7 @@ export default function ResultModal({
                   <div className="grid grid-cols-2 gap-3">
                     {facts.map((f, i) => (
                       <div key={i} className="rounded-lg bg-background/60 border border-border/60 p-2.5">
-                        <div className="text-lg font-mono font-bold text-primary leading-tight">{formatNumber(f.value)}</div>
+                        <div className="text-lg font-mono tabular-nums font-bold text-primary leading-tight">{formatNumber(f.value)}</div>
                         <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">{f.label}</div>
                       </div>
                     ))}

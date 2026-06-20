@@ -68,14 +68,14 @@ export default function Header() {
           )}
 
           <Link href="/leaderboard">
-            <Button variant="ghost" size="icon" title="Leaderboard" data-testid="button-leaderboard">
+            <Button variant="ghost" size="icon" title="Leaderboard" aria-label="Leaderboard" data-testid="button-leaderboard">
               <Trophy className="w-5 h-5" />
             </Button>
           </Link>
 
           {isLoaded && user && (
             <Link href="/create">
-              <Button variant="ghost" size="icon" title="Create Puzzle" data-testid="button-create">
+              <Button variant="ghost" size="icon" title="Create Puzzle" aria-label="Create Puzzle" data-testid="button-create">
                 <PlusCircle className="w-5 h-5" />
               </Button>
             </Link>
@@ -93,6 +93,7 @@ export default function Header() {
                     size="icon"
                     onClick={handleSignOut}
                     title="Sign Out"
+                    aria-label="Sign Out"
                     data-testid="button-signout"
                   >
                     <LogOut className="w-5 h-5 text-muted-foreground" />
@@ -104,6 +105,7 @@ export default function Header() {
                   size="icon"
                   onClick={() => setLocation("/sign-in")}
                   title="Sign In"
+                  aria-label="Sign In"
                   data-testid="button-signin"
                 >
                   <LogIn className="w-5 h-5" />

@@ -146,8 +146,23 @@ export default function AudioPlayer({ src }: AudioPlayerProps) {
           </div>
 
           <div
-            className="relative w-full h-1.5 rounded-full bg-white/10 cursor-pointer group"
+            className="relative w-full h-1.5 rounded-full bg-white/10 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            role="slider"
+            tabIndex={0}
+            aria-valuemin={0}
+            aria-valuemax={duration || 100}
+            aria-valuenow={currentTime}
+            aria-label="Seek audio"
             onClick={seek}
+            onKeyDown={(e) => {
+              const audio = audioRef.current;
+              if (!audio || !duration) return;
+              if (e.key === "ArrowRight") {
+                audio.currentTime = Math.min(duration, audio.currentTime + 5);
+              } else if (e.key === "ArrowLeft") {
+                audio.currentTime = Math.max(0, audio.currentTime - 5);
+              }
+            }}
           >
             <div
               className="absolute top-0 left-0 h-full rounded-full bg-primary transition-all"

@@ -54,6 +54,8 @@ export default function GuessInput({ onGuess, disabled }: GuessInputProps) {
               value={search} 
               onValueChange={setSearch}
               className="h-12 border-none focus:ring-0"
+              autoComplete="off"
+              spellCheck={false}
               data-testid="input-guess-search"
             />
             <CommandList className="max-h-[300px] overflow-y-auto custom-scrollbar">
@@ -76,7 +78,7 @@ export default function GuessInput({ onGuess, disabled }: GuessInputProps) {
                     >
                       <div className="w-10 h-10 shrink-0 bg-muted rounded flex items-center justify-center overflow-hidden border border-border">
                         {track.albumArtUrl ? (
-                          <img src={track.albumArtUrl} alt={track.title} className="w-full h-full object-cover" />
+                          <img src={track.albumArtUrl} alt={track.title} width={40} height={40} loading="lazy" className="w-full h-full object-cover" />
                         ) : (
                           <Music className="w-5 h-5 opacity-20" />
                         )}
