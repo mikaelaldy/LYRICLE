@@ -346,7 +346,7 @@ async function buildClue0(puzzle: PuzzleCache): Promise<ClueData> {
   }
 
   // Derive mood from genre if available
-  if (!mood && track.primary_genres) {
+  if (!mood && (track as any).primary_genres) {
     const genre = (track as unknown as { primary_genres?: { music_genre_list?: Array<{ music_genre: { music_genre_name: string } }> } })
       .primary_genres?.music_genre_list?.[0]?.music_genre?.music_genre_name;
     if (genre) {

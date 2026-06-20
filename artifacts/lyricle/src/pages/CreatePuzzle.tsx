@@ -36,7 +36,7 @@ const fadeIn = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
   exit: { opacity: 0, y: -12, transition: { duration: 0.2 } },
-};
+} as const;
 
 export default function CreatePuzzle() {
   const { user, isLoaded } = useUser();

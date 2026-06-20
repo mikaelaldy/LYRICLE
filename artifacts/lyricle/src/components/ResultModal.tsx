@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   RotateCcw,
   LogIn,
+  Swords,
 } from "lucide-react";
 import { useGetPuzzleAnswer, useGetPlayerStreak } from "@workspace/api-client-react";
 import { getGetPuzzleAnswerQueryKey, getGetPlayerStreakQueryKey } from "@workspace/api-client-react";
@@ -443,6 +444,48 @@ export default function ResultModal({
         </div>
 
         <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-4">
+          <Button
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/duels", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    puzzleType: "daily",
+                    puzzleRef: state.date,
+                    wager: 50,
+                    cluesUsed: state.guesses.length,
+                    solveTimeMs: state.solveTimeMs,
+                    won: state.won,
+                    displayName: getPlayerData().displayName || "Anonymous",
+                  }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  toast({
+                    title: "Duel created!",
+                    description: "Your challenge was posted. Opponents can accept it in the Arena.",
+                  });
+                  onOpenChange(false);
+                } else {
+                  toast({
+                    title: "Duel creation failed",
+                    description: data.error || "Please try again.",
+                    variant: "destructive",
+                  });
+                }
+              } catch {
+                toast({
+                  title: "Network error",
+                  description: "Please check your connection.",
+                  variant: "destructive",
+                });
+              }
+            }}
+            className="flex-1 gap-2 font-bold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white rounded-full h-10"
+          >
+            <Swords className="w-4 h-4" /> Create Duel
+          </Button>
           <Button onClick={handleShare} className="flex-1 gap-2 font-bold" data-testid="button-share">
             <Share2 className="w-4 h-4" /> Share
           </Button>

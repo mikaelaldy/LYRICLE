@@ -189,7 +189,7 @@ router.post("/puzzles", async (req: Request, res): Promise<void> => {
 // Returns puzzle metadata for the player — answer fields (trackName, artistName) are OMITTED.
 // Unauthenticated callers always receive playsRemaining: 0 so the play gate shows correctly.
 router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { userId } = getAuth(req);
 
   try {
@@ -243,7 +243,7 @@ router.get("/puzzles/:id", async (req: Request, res): Promise<void> => {
 // GET /puzzles/:id/media
 // Returns lyrics + iTunes audio URL + enhanced album art for progressive reveal stages.
 router.get("/puzzles/:id/media", async (req: Request, res): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { userId } = getAuth(req);
 
   if (!userId) {
@@ -297,7 +297,7 @@ router.get("/puzzles/:id/media", async (req: Request, res): Promise<void> => {
 // Validates a single guess server-side. Returns only {correct} — the answer is
 // NEVER revealed here; it is returned by POST /play once the game is recorded.
 router.post("/puzzles/:id/guess", async (req: Request, res): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { userId } = getAuth(req);
 
   if (!userId) {
@@ -343,7 +343,7 @@ router.post("/puzzles/:id/guess", async (req: Request, res): Promise<void> => {
 // Spends 50 points to grant one extra play by decrementing playsToday.
 // Does NOT record a play or update puzzle stats — that happens via /play after the game completes.
 router.post("/puzzles/:id/unlock", async (req: Request, res): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { userId } = getAuth(req);
 
   if (!userId) {
@@ -401,7 +401,7 @@ router.post("/puzzles/:id/unlock", async (req: Request, res): Promise<void> => {
 // Records a completed game (win or loss) and awards points.
 // Requires authentication — unauthenticated plays cannot be tracked.
 router.post("/puzzles/:id/play", async (req: Request, res): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { userId } = getAuth(req);
 
   if (!userId) {

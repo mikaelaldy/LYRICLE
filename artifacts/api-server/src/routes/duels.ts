@@ -1,7 +1,7 @@
 import { Router, type Request } from "express";
 import { getAuth } from "@clerk/express";
 import { db, duelsTable, userStatsTable } from "@workspace/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -153,15 +153,15 @@ router.post("/duels/:id/submit", async (req, res): Promise<void> => {
   const pool = duel.wager * 2;
   if (winnerId) {
     await db.update(userStatsTable).set({
-      points: db.raw(`${userStatsTable.points} + ${pool}`)
+      points: sql`${userStatsTable.points} + ${pool}`
     }).where(eq(userStatsTable.userId, winnerId));
   } else {
     // Refund wagers on tie
     await db.update(userStatsTable).set({
-      points: db.raw(`${userStatsTable.points} + ${duel.wager}`)
+      points: sql`${userStatsTable.points} + ${duel.wager}`
     }).where(eq(userStatsTable.userId, duel.creatorId));
     await db.update(userStatsTable).set({
-      points: db.raw(`${userStatsTable.points} + ${duel.wager}`)
+      points: sql`${userStatsTable.points} + ${duel.wager}`
     }).where(eq(userStatsTable.userId, auth.userId));
   }
 

@@ -1,7 +1,7 @@
 import { Router, type Request } from "express";
 import { getAuth } from "@clerk/express";
 import { db, userQuestsTable, userStatsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -80,7 +80,7 @@ router.post("/quests/:id/claim", async (req, res): Promise<void> => {
   // Mark claimed & update user points
   await db.update(userQuestsTable).set({ claimed: true, completed: true }).where(eq(userQuestsTable.id, id));
   await db.update(userStatsTable).set({
-    points: db.raw(`${userStatsTable.points} + ${quest.pointsReward}`)
+    points: sql`${userStatsTable.points} + ${quest.pointsReward}`
   }).where(eq(userStatsTable.userId, auth.userId));
 
   res.json({ success: true, claimedReward: quest.pointsReward });
