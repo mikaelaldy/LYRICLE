@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
@@ -17,6 +17,8 @@ import DevLogin from "@/pages/DevLogin";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import Lobby from "@/pages/Lobby";
 import PlayDuel from "@/pages/PlayDuel";
+import { ClerkErrorBoundary } from "@/components/ClerkErrorBoundary";
+import { AuthContext, ClerkAuthBridge, useAuthUser } from "@/context/AuthContext";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -101,7 +103,7 @@ function ClerkQueryClientCacheInvalidator() {
 }
 
 function HomeRoute() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthUser();
   if (!isLoaded) return null;
   return user ? <Game /> : <Landing />;
 }
@@ -124,27 +126,69 @@ function Router() {
   );
 }
 
-function App() {
+function GuestRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={Game} />
+      <Route path="/game" component={Game} />
+      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/p/:id" component={PlayPuzzle} />
+      <Route path="/sign-in/*?"><Redirect to="/" /></Route>
+      <Route path="/sign-up/*?"><Redirect to="/" /></Route>
+      <Route path="/create"><Redirect to="/" /></Route>
+      <Route path="/lobby"><Redirect to="/" /></Route>
+      <Route path="/duel/:id"><Redirect to="/" /></Route>
+      <Route path="/dev-login"><Redirect to="/" /></Route>
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function GuestApp() {
+  return (
+    <AuthContext.Provider value={{ user: null, isLoaded: true }}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <GuestRouter />
+          <FeedbackWidget />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </AuthContext.Provider>
+  );
+}
+
+function ClerkApp() {
   const [, setLocation] = useLocation();
 
   return (
-    <WouterRouter base={basePath}>
-      <ClerkProvider
-        publishableKey={clerkPubKey}
-        proxyUrl={clerkProxyUrl}
-        routerPush={(to) => setLocation(stripBase(to))}
-        routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
-        appearance={clerkAppearance}
-      >
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <ClerkQueryClientCacheInvalidator />
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+      appearance={clerkAppearance}
+    >
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <ClerkQueryClientCacheInvalidator />
+          <ClerkAuthBridge>
             <Router />
             <FeedbackWidget />
             <Toaster />
-          </TooltipProvider>
-        </QueryClientProvider>
-      </ClerkProvider>
+          </ClerkAuthBridge>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
+function App() {
+  return (
+    <WouterRouter base={basePath}>
+      <ClerkErrorBoundary fallback={<GuestApp />}>
+        <ClerkApp />
+      </ClerkErrorBoundary>
     </WouterRouter>
   );
 }

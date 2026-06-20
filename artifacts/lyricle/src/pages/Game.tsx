@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useGetTodayPuzzle, useGetPuzzleClue, useSubmitGuess, useSubmitResult, useGetPuzzleAnswer } from "@workspace/api-client-react";
 import { getGetTodayPuzzleQueryKey, getGetPuzzleClueQueryKey, getSubmitGuessMutationOptions, getSubmitResultMutationOptions, getGetPuzzleAnswerQueryKey } from "@workspace/api-client-react";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/Header";
 import ClueCard from "@/components/ClueCard";
@@ -52,7 +52,7 @@ function LiveTimer({ startTimeMs, completed, frozenMs, pausedAt }: { startTimeMs
 }
 
 export default function Game() {
-  const { user, isLoaded: clerkLoaded } = useUser();
+  const { user, isLoaded: clerkLoaded } = useAuthUser();
   const { data: puzzle, isLoading: puzzleLoading, isError: puzzleError } = useGetTodayPuzzle();
   
   const [gameState, setGameState] = useState<DailyState | null>(null);

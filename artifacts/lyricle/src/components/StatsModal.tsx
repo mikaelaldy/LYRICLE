@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { useGetMyStats, useGetPlayerStreak } from "@workspace/api-client-react";
 import { getGetMyStatsQueryKey, getGetPlayerStreakQueryKey } from "@workspace/api-client-react";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
 import { useLocation } from "wouter";
 
@@ -12,7 +12,7 @@ interface StatsModalProps {
 }
 
 export default function StatsModal({ open, onOpenChange }: StatsModalProps) {
-  const { user } = useUser();
+  const { user } = useAuthUser();
   const [, setLocation] = useLocation();
   const playerId = localStorage.getItem("lyricle_player") ? JSON.parse(localStorage.getItem("lyricle_player")!).playerId : "";
 

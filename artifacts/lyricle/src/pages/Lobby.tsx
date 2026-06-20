@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Trophy, Calendar, Coins, Play, Plus, Loader2 } from "lucide-react";
@@ -26,7 +26,7 @@ interface Duel {
 }
 
 export default function Lobby() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthUser();
   const [, setLocation] = useLocation();
   const [points, setPoints] = useState(0);
   const [quests, setQuests] = useState<Quest[]>([]);

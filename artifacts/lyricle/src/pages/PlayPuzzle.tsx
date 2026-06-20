@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Music2, Headphones, FileText, Image, Trophy, RotateCcw, Zap, Lock, ChevronRight, LogIn, BarChart2, MapPin, Calendar, Sparkles, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,7 @@ interface Props {
 
 export default function PlayPuzzle({ params }: Props) {
   const puzzleId = params?.id ?? "";
-  const { user } = useUser();
+  const { user } = useAuthUser();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 

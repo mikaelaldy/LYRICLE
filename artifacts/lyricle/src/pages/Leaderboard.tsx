@@ -10,7 +10,7 @@ import {
   Music,
 } from "lucide-react";
 import { Link } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { flagEmoji, countryName } from "@/lib/countries";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -83,7 +83,7 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 }
 
 export default function Leaderboard() {
-  const { user } = useUser();
+  const { user } = useAuthUser();
 
   const [guessers, setGuessers] = useState<LeaderboardResponse<GuesserEntry> | null>(null);
   const [guessersLoading, setGuessersLoading] = useState(true);

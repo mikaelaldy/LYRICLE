@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -170,7 +170,7 @@ const FEATURE_CARDS = [
 
 export default function Landing() {
   const [, setLocation] = useLocation();
-  const { user } = useUser();
+  const { user } = useAuthUser();
 
   const goToPlay = () => setLocation("/game");
   const goToCreate = () => setLocation(user ? "/create" : "/sign-up");

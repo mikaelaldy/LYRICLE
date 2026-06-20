@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { Loader2, Image, Swords, Trophy, ArrowRight } from "lucide-react";
 import Header from "@/components/Header";
 import GuessInput from "@/components/GuessInput";
@@ -52,7 +52,7 @@ interface DuelResult {
 }
 
 export default function PlayDuel({ params }: { params: { id: string } }) {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthUser();
   const [, setLocation] = useLocation();
   const [duel, setDuel] = useState<DuelDetails | null>(null);
   const [loading, setLoading] = useState(true);

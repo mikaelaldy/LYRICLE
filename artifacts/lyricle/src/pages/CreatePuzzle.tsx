@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuthUser } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ArrowRight, ArrowLeft, Check, Copy, Music2, Sparkles, Badge as BadgeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ const fadeIn = {
 } as const;
 
 export default function CreatePuzzle() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthUser();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
