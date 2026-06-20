@@ -170,7 +170,7 @@ export default function Landing() {
   const [, setLocation] = useLocation();
   const { user } = useUser();
 
-  const goToPlay = () => setLocation(user ? "/game" : "/sign-up");
+  const goToPlay = () => setLocation("/game");
   const goToCreate = () => setLocation(user ? "/create" : "/sign-up");
   const goToLeaderboard = () => setLocation("/leaderboard");
 

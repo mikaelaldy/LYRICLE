@@ -5,6 +5,10 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 
 const router = Router();
 
+const MAX_WAGER = 10_000;
+const MAX_CLUES = 5;
+const MAX_SOLVE_MS = 1_800_000; // 30 minutes
+
 router.post("/duels", async (req, res): Promise<void> => {
   const auth = getAuth(req as Request);
   if (!auth?.userId) {
@@ -14,25 +18,41 @@ router.post("/duels", async (req, res): Promise<void> => {
 
   const { puzzleType, puzzleRef, wager, cluesUsed, solveTimeMs, won, displayName } = req.body;
 
+  // Validate inputs strictly
+  const parsedWager = Number(wager);
+  const parsedClues = Number(cluesUsed);
+  const parsedTime = Number(solveTimeMs);
+
+  if (
+    !Number.isInteger(parsedWager) || parsedWager < 0 || parsedWager > MAX_WAGER ||
+    !Number.isInteger(parsedClues) || parsedClues < 1 || parsedClues > MAX_CLUES ||
+    !Number.isFinite(parsedTime) || parsedTime < 0 || parsedTime > MAX_SOLVE_MS ||
+    typeof won !== "boolean" ||
+    !puzzleType || !puzzleRef
+  ) {
+    res.status(400).json({ error: "Invalid request parameters" });
+    return;
+  }
+
   // Validate points balance
   const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, auth.userId)).limit(1);
-  if (!stats || stats.points < wager) {
+  if (!stats || stats.points < parsedWager) {
     res.status(400).json({ error: "Insufficient points balance for wager" });
     return;
   }
 
   // Deduct points
-  await db.update(userStatsTable).set({ points: stats.points - wager }).where(eq(userStatsTable.userId, auth.userId));
+  await db.update(userStatsTable).set({ points: stats.points - parsedWager }).where(eq(userStatsTable.userId, auth.userId));
 
   // Insert Duel record
   const [duel] = await db.insert(duelsTable).values({
     creatorId: auth.userId,
-    creatorName: displayName || "Anonymous",
+    creatorName: String(displayName || "Anonymous").slice(0, 50),
     puzzleType,
     puzzleRef,
-    wager,
-    creatorCluesUsed: cluesUsed,
-    creatorSolveTimeMs: solveTimeMs,
+    wager: parsedWager,
+    creatorCluesUsed: parsedClues,
+    creatorSolveTimeMs: parsedTime,
     creatorWon: won,
     status: "pending",
   }).returning();
@@ -90,7 +110,7 @@ router.post("/duels/:id/accept", async (req, res): Promise<void> => {
   // Accept duel
   await db.update(duelsTable).set({
     opponentId: auth.userId,
-    opponentName: displayName || "Anonymous",
+    opponentName: String(displayName || "Anonymous").slice(0, 50),
     status: "playing",
   }).where(eq(duelsTable.id, id));
 
@@ -107,33 +127,47 @@ router.post("/duels/:id/submit", async (req, res): Promise<void> => {
   const { id } = req.params;
   const { cluesUsed, solveTimeMs, won } = req.body;
 
+  const parsedClues = Number(cluesUsed);
+  const parsedTime = Number(solveTimeMs);
+
+  if (
+    !Number.isInteger(parsedClues) || parsedClues < 1 || parsedClues > MAX_CLUES ||
+    !Number.isFinite(parsedTime) || parsedTime < 0 || parsedTime > MAX_SOLVE_MS ||
+    typeof won !== "boolean"
+  ) {
+    res.status(400).json({ error: "Invalid request parameters" });
+    return;
+  }
+
   const [duel] = await db.select().from(duelsTable).where(eq(duelsTable.id, id)).limit(1);
   if (!duel || duel.status !== "playing") {
     res.status(400).json({ error: "Duel not in playing state" });
     return;
   }
 
+  // Enforce that only the recorded opponent can submit
+  if (duel.opponentId !== auth.userId) {
+    res.status(403).json({ error: "You are not the opponent in this duel" });
+    return;
+  }
+
   let winnerId: string | null = null;
-  let status = "completed";
 
   if (won && !duel.creatorWon) {
     winnerId = auth.userId;
   } else if (!won && duel.creatorWon) {
     winnerId = duel.creatorId;
   } else if (won && duel.creatorWon) {
-    // Both solved, compare clue stage count
-    if (cluesUsed < duel.creatorCluesUsed) {
+    if (parsedClues < duel.creatorCluesUsed) {
       winnerId = auth.userId;
-    } else if (duel.creatorCluesUsed < cluesUsed) {
+    } else if (duel.creatorCluesUsed < parsedClues) {
       winnerId = duel.creatorId;
     } else {
-      // Clues are tie, check solve time
-      if (solveTimeMs < duel.creatorSolveTimeMs) {
+      if (parsedTime < duel.creatorSolveTimeMs) {
         winnerId = auth.userId;
-      } else if (duel.creatorSolveTimeMs < solveTimeMs) {
+      } else if (duel.creatorSolveTimeMs < parsedTime) {
         winnerId = duel.creatorId;
       } else {
-        // Absolute tie
         winnerId = null;
       }
     }
@@ -141,11 +175,11 @@ router.post("/duels/:id/submit", async (req, res): Promise<void> => {
 
   // Update duel
   await db.update(duelsTable).set({
-    opponentCluesUsed: cluesUsed,
-    opponentSolveTimeMs: solveTimeMs,
+    opponentCluesUsed: parsedClues,
+    opponentSolveTimeMs: parsedTime,
     opponentWon: won,
     winnerId,
-    status,
+    status: "completed",
     completedAt: new Date(),
   }).where(eq(duelsTable.id, id));
 
