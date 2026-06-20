@@ -15,6 +15,7 @@ import PlayPuzzle from "@/pages/PlayPuzzle";
 import NotFound from "@/pages/not-found";
 import DevLogin from "@/pages/DevLogin";
 import FeedbackWidget from "@/components/FeedbackWidget";
+import Lobby from "@/pages/Lobby";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -111,6 +112,7 @@ function Router() {
       <Route path="/game" component={Game} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/create" component={CreatePuzzle} />
+      <Route path="/lobby" component={Lobby} />
       <Route path="/p/:id" component={PlayPuzzle} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
