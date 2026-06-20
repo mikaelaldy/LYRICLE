@@ -87,13 +87,14 @@ function MockPuzzleCard() {
         <div className="px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-1.5 mb-2">
             <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 2 · Lyrics</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 2 · Vibes &amp; Themes</span>
           </div>
-          <div className="space-y-1 font-mono text-xs leading-relaxed">
-            <div className="text-gray-400 px-2 py-0.5">♪ Summer nights and city lights...</div>
-            <div className="px-2 py-1 bg-primary/10 border border-primary/30 rounded text-primary font-bold">[ ??? ]</div>
-            <div className="text-gray-400 px-2 py-0.5">♪ And you were there beside me</div>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {["#nostalgia", "#summer", "#heartbreak"].map((tag) => (
+              <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-mono">{tag}</span>
+            ))}
           </div>
+          <p className="text-xs text-gray-400 italic font-sans">"Feeling nostalgic..."</p>
         </div>
 
         <div className="px-5 py-4">
@@ -108,7 +109,7 @@ function MockPuzzleCard() {
               <div key={i} className={`flex-1 h-1.5 rounded-full ${i === 0 ? "bg-orange-300" : "bg-gray-200"}`} />
             ))}
           </div>
-          <p className="text-[10px] text-gray-400 mt-1.5 text-center font-mono">4 guesses remaining</p>
+          <p className="text-[10px] text-gray-400 mt-1.5 text-center font-mono">5 guesses remaining</p>
         </div>
       </div>
     </motion.div>
