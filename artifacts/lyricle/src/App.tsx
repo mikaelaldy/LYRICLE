@@ -13,6 +13,7 @@ import Leaderboard from "@/pages/Leaderboard";
 import CreatePuzzle from "@/pages/CreatePuzzle";
 import PlayPuzzle from "@/pages/PlayPuzzle";
 import NotFound from "@/pages/not-found";
+import DevLogin from "@/pages/DevLogin";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -113,6 +114,7 @@ function Router() {
       <Route path="/p/:id" component={PlayPuzzle} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route path="/dev-login" component={DevLogin} />
       <Route component={NotFound} />
     </Switch>
   );
