@@ -117,19 +117,34 @@ function MockPuzzleCard() {
 
 const HOW_TO_PLAY = [
   {
-    emoji: "🔍",
-    title: "Pick a Song & Write a Clue",
-    description: "Search for any song from Musixmatch's database. Write a personal clue explaining why this song matters to you.",
+    step: "01",
+    emoji: "🎯",
+    title: "Start the Daily Puzzle",
+    description: "A brand new song drops every day at midnight. Every player gets the exact same puzzle — it's a level playing field.",
   },
   {
-    emoji: "✂️",
-    title: "Mask the Lyrics",
-    description: "We'll pull the official lyrics. Your job is to select one specific line to block out from the player.",
+    step: "02",
+    emoji: "🧩",
+    title: "Unlock Clues Stage by Stage",
+    description: "Begin with Stage 1 — the creator's personal note about the song. Each wrong guess reveals a new, more direct clue.",
   },
   {
-    emoji: "🚀",
-    title: "Share & Challenge",
-    description: "Send your unique link to your group chat or crush. See who can guess the hidden lyric the fastest!",
+    step: "03",
+    emoji: "✍️",
+    title: "Type Your Guess",
+    description: "Search for the artist & song title using the autocomplete box. You have 5 guesses total — use them wisely.",
+  },
+  {
+    step: "04",
+    emoji: "⏱️",
+    title: "Race the Clock",
+    description: "Your solve time is tracked. Guess it in fewer stages and faster to earn maximum points on the leaderboard.",
+  },
+  {
+    step: "05",
+    emoji: "🏆",
+    title: "Share Your Score",
+    description: "After you finish, share your result and see where you rank globally. Come back tomorrow for a new challenge.",
   },
 ];
 
@@ -219,26 +234,51 @@ export default function Landing() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="text-center mb-12"
+            className="text-center mb-4"
           >
             <h2 className="text-4xl font-black text-gray-900 mb-3">How to Play Lyricle</h2>
+            <p className="text-gray-500 max-w-xl mx-auto">
+              Five stages. Five guesses. One song. A new puzzle every day.
+            </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {HOW_TO_PLAY.map((step, i) => (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="flex justify-center mb-10"
+          >
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setLocation(user ? "/game" : "/sign-up")}
+              className="rounded-full font-semibold px-5 border-primary/40 text-primary hover:bg-primary/5"
+            >
+              {user ? "Play Today's Puzzle →" : "Try it Free →"}
+            </Button>
+          </motion.div>
+
+          <div className="space-y-4">
+            {HOW_TO_PLAY.map((item, i) => (
               <motion.div
-                key={step.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                key={item.title}
+                initial={{ opacity: 0, x: -16 }}
+                whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="flex flex-col p-6 bg-white border border-gray-200 rounded-3xl shadow-sm hover:shadow-md hover:border-primary/20 transition-all"
+                transition={{ duration: 0.35, delay: i * 0.08 }}
+                className="flex items-start gap-5 p-5 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md hover:border-primary/20 transition-all"
               >
-                <div className="text-3xl mb-4">{step.emoji}</div>
-                <h3 className="font-bold text-gray-900 mb-2 text-lg">
-                  Step {i + 1}: {step.title} {step.emoji}
-                </h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{step.description}</p>
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-lg">{item.emoji}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-xs font-bold text-primary">STEP {item.step}</span>
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-base mb-1">{item.title}</h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
+                </div>
               </motion.div>
             ))}
           </div>

@@ -24,15 +24,18 @@ function formatTime(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function LiveTimer({ startTimeMs, completed, frozenMs }: { startTimeMs: number; completed: boolean; frozenMs: number | null | undefined }) {
+function LiveTimer({ startTimeMs, completed, frozenMs, pausedAt }: { startTimeMs: number; completed: boolean; frozenMs: number | null | undefined; pausedAt: number | null }) {
   const [elapsed, setElapsed] = useState(() => Date.now() - startTimeMs);
 
   useEffect(() => {
-    if (completed) return;
+    if (completed || pausedAt) {
+      if (pausedAt) setElapsed(pausedAt - startTimeMs);
+      return;
+    }
     setElapsed(Date.now() - startTimeMs);
     const id = setInterval(() => setElapsed(Date.now() - startTimeMs), 1000);
     return () => clearInterval(id);
-  }, [completed, startTimeMs]);
+  }, [completed, startTimeMs, pausedAt]);
 
   const display = completed ? formatTime(frozenMs ?? 0) : formatTime(elapsed);
 
@@ -56,6 +59,8 @@ export default function Game() {
   const [showResult, setShowResult] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [timerPauseStart, setTimerPauseStart] = useState<number | null>(null);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [displayName, setDisplayName] = useState("");
 
@@ -88,12 +93,34 @@ export default function Game() {
   useEffect(() => {
     if (!hasSeenTutorial()) {
       setShowTutorial(true);
+      setTutorialStep(0);
+      setTimerPauseStart(Date.now());
     }
     const player = getPlayerData();
     if (!player.displayName && !user) {
       setShowNamePrompt(true);
     }
   }, [user]);
+
+  const handleOpenTutorial = () => {
+    setTutorialStep(0);
+    setShowTutorial(true);
+    if (gameState && !gameState.completed) {
+      setTimerPauseStart(Date.now());
+    }
+  };
+
+  const handleCloseTutorial = (markSeen = false) => {
+    if (timerPauseStart && gameState && !gameState.completed) {
+      const pausedMs = Date.now() - timerPauseStart;
+      const updated = { ...gameState, startTimeMs: gameState.startTimeMs + pausedMs };
+      setGameState(updated);
+      saveDailyState(gameState.puzzleNumber, updated);
+    }
+    setTimerPauseStart(null);
+    setShowTutorial(false);
+    if (markSeen) setSeenTutorial();
+  };
 
   const handleGuess = (artist: string, title: string) => {
     if (!gameState || gameState.completed) return;
@@ -244,8 +271,9 @@ export default function Game() {
               startTimeMs={gameState.startTimeMs}
               completed={gameState.completed}
               frozenMs={gameState.solveTimeMs}
+              pausedAt={timerPauseStart}
             />
-            <Button variant="ghost" size="icon" onClick={() => setShowTutorial(true)} data-testid="button-help">
+            <Button variant="ghost" size="icon" onClick={handleOpenTutorial} data-testid="button-help">
               <HelpCircle className="w-5 h-5" />
             </Button>
           </div>
@@ -307,46 +335,13 @@ export default function Game() {
         onOpenChange={setShowStats} 
       />
 
-      <Dialog open={showTutorial} onOpenChange={setShowTutorial}>
-        <DialogContent className="bg-card border-border sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-3xl font-serif font-black text-center italic mb-4">How to Play</DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-4 text-foreground/80">
-                <span className="block">Guess the <span className="text-primary font-bold">Lyricle</span> in 5 stages or fewer.</span>
-                <ul className="space-y-3 font-medium">
-                  <li className="flex gap-3">
-                    <span className="font-mono text-primary">01</span>
-                    <span>Analyze themes and moods to get a vibe for the track.</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-mono text-primary">02</span>
-                    <span>Read a translated lyric line—something might sound familiar.</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-mono text-primary">03</span>
-                    <span>Get a snippet of the actual lyrics.</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-mono text-primary">04</span>
-                    <span>Watch the words appear as they would be sung.</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="font-mono text-primary">05</span>
-                    <span>Listen to the audio preview or see the album art.</span>
-                  </li>
-                </ul>
-                <span className="block text-xs text-muted-foreground mt-4 font-mono uppercase text-center">A new puzzle awaits every day at midnight.</span>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button className="w-full font-bold uppercase tracking-widest" onClick={() => { setShowTutorial(false); setSeenTutorial(); }}>
-              Let's Play
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TutorialDialog
+        open={showTutorial}
+        step={tutorialStep}
+        onStepChange={setTutorialStep}
+        onClose={() => handleCloseTutorial(false)}
+        onDone={() => handleCloseTutorial(true)}
+      />
 
       <Dialog open={showNamePrompt} onOpenChange={setShowNamePrompt}>
         <DialogContent className="bg-card border-border sm:max-w-md">
@@ -406,4 +401,144 @@ function ClueRenderer({ stage, isRevealed, isActive }: { stage: number, isReveal
 
 function cn(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
+}
+
+const TUTORIAL_STEPS = [
+  {
+    title: "Welcome to Lyricle 🎵",
+    content: (
+      <div className="space-y-4 text-foreground/80">
+        <p>
+          Each day a new song puzzle drops. Your goal: guess the <span className="text-primary font-bold">artist & title</span> using as few clues as possible.
+        </p>
+        <div className="rounded-xl bg-secondary/50 border border-border p-4 space-y-2 font-mono text-sm">
+          <div className="flex items-center gap-3">
+            <span className="text-primary font-bold">5</span>
+            <span className="text-muted-foreground">clue stages to unlock</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-primary font-bold">5</span>
+            <span className="text-muted-foreground">guesses before game over</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-primary font-bold">1</span>
+            <span className="text-muted-foreground">new puzzle every midnight</span>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Fewer clues used + faster solve time = more points on the leaderboard.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: "The 5 Stages",
+    content: (
+      <div className="space-y-3">
+        {[
+          { n: "01", label: "Creator's Clue", desc: "A personal note from whoever made this puzzle — why this song matters to them." },
+          { n: "02", label: "Mood & Themes", desc: "AI-analyzed emotions and themes from the lyrics. Abstract, but a real vibe." },
+          { n: "03", label: "Translated Lyric", desc: "One lyric line rendered in another language. A cryptic hint." },
+          { n: "04", label: "Lyrics Snippet", desc: "A direct excerpt from the song's official lyrics." },
+          { n: "05", label: "Audio + Art", desc: "A 30-second preview clip and the album cover. Almost too easy." },
+        ].map(({ n, label, desc }) => (
+          <div key={n} className="flex gap-3 items-start">
+            <span className="font-mono text-primary font-bold text-sm mt-0.5 shrink-0">{n}</span>
+            <div>
+              <p className="font-semibold text-foreground text-sm">{label}</p>
+              <p className="text-xs text-muted-foreground">{desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    title: "How to Guess",
+    content: (
+      <div className="space-y-4 text-foreground/80">
+        <p className="text-sm">Type the artist name and song title in the search box at the bottom of the screen. Select from the autocomplete dropdown.</p>
+        <div className="rounded-xl bg-secondary/50 border border-border p-4 space-y-3 text-sm">
+          <div className="flex gap-2 items-start">
+            <span className="text-green-500 font-bold shrink-0">✓</span>
+            <span>Correct guess → puzzle complete! Your time stops.</span>
+          </div>
+          <div className="flex gap-2 items-start">
+            <span className="text-red-400 font-bold shrink-0">✗</span>
+            <span>Wrong guess → next stage unlocks automatically.</span>
+          </div>
+          <div className="flex gap-2 items-start">
+            <span className="text-primary font-bold shrink-0">⏱</span>
+            <span>Timer is paused while you read this guide. It resumes when you close it.</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground font-mono text-center uppercase tracking-widest">
+          Log in to save your score &amp; compete on the leaderboard
+        </p>
+      </div>
+    ),
+  },
+];
+
+function TutorialDialog({
+  open,
+  step,
+  onStepChange,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  step: number;
+  onStepChange: (s: number) => void;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const current = TUTORIAL_STEPS[step];
+  const isLast = step === TUTORIAL_STEPS.length - 1;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="bg-card border-border sm:max-w-md">
+        <DialogHeader>
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">
+              {step + 1} / {TUTORIAL_STEPS.length}
+            </span>
+            <div className="flex gap-1">
+              {TUTORIAL_STEPS.map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1 rounded-full transition-all ${i === step ? "w-6 bg-primary" : "w-2 bg-border"}`}
+                />
+              ))}
+            </div>
+          </div>
+          <DialogTitle className="text-2xl font-serif font-black italic">
+            {current.title}
+          </DialogTitle>
+        </DialogHeader>
+
+        <DialogDescription asChild>
+          <div className="py-2">{current.content}</div>
+        </DialogDescription>
+
+        <DialogFooter className="flex gap-2 sm:gap-2">
+          {step > 0 && (
+            <Button variant="outline" className="flex-1 font-semibold" onClick={() => onStepChange(step - 1)}>
+              Back
+            </Button>
+          )}
+          {isLast ? (
+            <Button className="flex-1 font-bold uppercase tracking-widest" onClick={onDone}>
+              Let's Play
+            </Button>
+          ) : (
+            <Button className="flex-1 font-bold" onClick={() => onStepChange(step + 1)}>
+              Next →
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
