@@ -67,7 +67,7 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
   const [ugcMedia, setUgcMedia] = useState<UGCMediaData | null>(null);
   const [mediaLoading, setMediaLoading] = useState(false);
 
-  // Daily State — only fetch clues as stages are revealed
+  // Daily State - only fetch clues as stages are revealed
   const [dailyClues, setDailyClues] = useState<Map<number, DailyClue>>(new Map());
   const [clueLoading, setClueLoading] = useState(false);
 
@@ -154,7 +154,7 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
     if (guessing) return;
     setGuessing(true);
 
-    const guessText = `${artist} — ${title}`;
+    const guessText = `${artist} - ${title}`;
     const newGuesses = [...guesses, guessText];
     setGuesses(newGuesses);
 
@@ -365,7 +365,7 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
               )}
             </div>
           ) : (
-            // Daily puzzle clues — loaded lazily per stage
+            // Daily puzzle clues - loaded lazily per stage
             <div className="space-y-4">
               {clueLoading && !dailyClues.has(stage) && (
                 <div className="flex justify-center py-4">

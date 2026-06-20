@@ -50,13 +50,13 @@ export default function StatsModal({ open, onOpenChange }: StatsModalProps) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={distribution} layout="vertical">
                 <XAxis type="number" hide />
-                <YAxis dataKey="cluesUsed" type="category" stroke="#a09880" fontSize={12} width={20} />
+                <YAxis dataKey="cluesUsed" type="category" stroke="#94a3b8" fontSize={12} width={20} />
                 <Tooltip 
-                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                  cursor={{ fill: 'rgba(0,0,0,0.02)' }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="bg-popover border border-border p-2 text-xs font-mono">
+                        <div className="bg-popover border border-border p-2 text-xs font-mono rounded shadow-sm">
                           {payload[0].value} games
                         </div>
                       );
@@ -66,7 +66,7 @@ export default function StatsModal({ open, onOpenChange }: StatsModalProps) {
                 />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                   {distribution?.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.count > 0 ? "#e8d44d" : "#2a2820"} />
+                    <Cell key={`cell-${index}`} fill={entry.count > 0 ? "#FF5500" : "#f1f5f9"} />
                   ))}
                 </Bar>
               </BarChart>

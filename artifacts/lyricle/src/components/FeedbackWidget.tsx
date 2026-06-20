@@ -78,7 +78,7 @@ export default function FeedbackWidget() {
           <DialogHeader>
             <DialogTitle className="font-['Outfit'] font-black">Send us feedback</DialogTitle>
             <DialogDescription>
-              Found a bug or have an idea? We'd love to hear it — no account needed.
+              Found a bug or have an idea? We'd love to hear it, no account needed.
             </DialogDescription>
           </DialogHeader>
 
@@ -108,7 +108,7 @@ export default function FeedbackWidget() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com — if you'd like a reply"
+                  placeholder="you@example.com (if you'd like a reply)"
                   data-testid="input-feedback-email"
                 />
               </div>

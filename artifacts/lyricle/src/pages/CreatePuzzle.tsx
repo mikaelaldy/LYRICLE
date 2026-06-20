@@ -107,7 +107,7 @@ export default function CreatePuzzle() {
         setSongTheme(data);
       }
     } catch {
-      // theme is optional — degrade gracefully
+      // theme is optional - degrade gracefully
     } finally {
       setLoadingTheme(false);
     }
@@ -322,7 +322,7 @@ export default function CreatePuzzle() {
               <div className="space-y-2 mb-6">
                 <h1 className="font-serif text-3xl font-black text-foreground">Song theme</h1>
                 <p className="text-muted-foreground">
-                  This is auto-generated from the song's lyrics. Players see it as <strong>Stage 2</strong> — their second clue after yours.
+                  This is auto-generated from the song's lyrics. Players see it as <strong>Stage 2</strong>, their second clue after yours.
                 </p>
               </div>
 
@@ -349,11 +349,11 @@ export default function CreatePuzzle() {
                       </p>
                     )}
                     {songTheme.themes.length === 0 && !songTheme.mood && (
-                      <p className="text-sm text-muted-foreground italic">Theme analysis unavailable for this track — players will still see a themed stage.</p>
+                      <p className="text-sm text-muted-foreground italic">Theme analysis unavailable for this track. Players will still see a themed stage.</p>
                     )}
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">Theme unavailable — players will still see a themed stage.</p>
+                  <p className="text-sm text-muted-foreground italic">Theme unavailable. Players will still see a themed stage.</p>
                 )}
               </div>
 
@@ -392,7 +392,7 @@ export default function CreatePuzzle() {
 
               <div className="space-y-2 mb-6">
                 <h1 className="font-serif text-3xl font-black text-foreground">Write your clue</h1>
-                <p className="text-muted-foreground">Share a personal memory or feeling tied to this song. This is <strong>Stage 1</strong> — the very first hint players see.</p>
+                <p className="text-muted-foreground">Share a personal memory or feeling tied to this song. This is <strong>Stage 1</strong>, the very first hint players see.</p>
               </div>
 
               <Textarea
@@ -433,7 +433,7 @@ export default function CreatePuzzle() {
             <motion.div key="step3" {...fadeIn}>
               <div className="space-y-2 mb-5">
                 <h1 className="font-serif text-3xl font-black text-foreground">Choose a lyric line</h1>
-                <p className="text-muted-foreground">Pick one line to reveal as <strong>Stage 3</strong>. Players see it as-is — a direct lyric clue to name the song.</p>
+                <p className="text-muted-foreground">Pick one line to reveal as <strong>Stage 3</strong>. Players see it as-is, a direct lyric clue to name the song.</p>
               </div>
 
               {loadingLyrics && (

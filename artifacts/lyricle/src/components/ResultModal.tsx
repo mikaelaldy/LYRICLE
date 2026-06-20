@@ -80,7 +80,7 @@ function formatNumber(n: number): string {
 }
 
 function formatTime(ms: number | null | undefined): string {
-  if (ms == null) return "—";
+  if (ms == null) return "-";
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
@@ -194,8 +194,8 @@ export default function ResultModal({
   const buildShareText = () => {
     const grid = buildEmojiGrid();
     const resultLine = state.won
-      ? `🎵 Lyricle #${state.puzzleNumber} — Got it in ${state.guesses.length}/5 (${formatTime(state.solveTimeMs)})`
-      : `🎵 Lyricle #${state.puzzleNumber} — Didn't get it`;
+      ? `🎵 Lyricle #${state.puzzleNumber} - Got it in ${state.guesses.length}/5 (${formatTime(state.solveTimeMs)})`
+      : `🎵 Lyricle #${state.puzzleNumber} - Didn't get it`;
     return `${resultLine}\n${grid}\n${window.location.origin}`;
   };
 

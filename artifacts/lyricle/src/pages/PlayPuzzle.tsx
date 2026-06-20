@@ -151,7 +151,7 @@ export default function PlayPuzzle({ params }: Props) {
         fetch(apiUrl(`/puzzles/${puzzleId}/media`))
           .then((r) => r.json() as Promise<MediaData & { error?: string }>)
           .then((m) => { if (!m.error) setMedia(m); })
-          .catch(() => {/* media is optional — degrade gracefully */})
+          .catch(() => {/* media is optional - degrade gracefully */})
           .finally(() => setMediaLoading(false));
       })
       .catch(() => setPhase("error"));
@@ -184,7 +184,7 @@ export default function PlayPuzzle({ params }: Props) {
     async (artist: string, title: string) => {
       if (!puzzle || phase !== "playing" || guessing) return;
 
-      const guessText = `${artist} — ${title}`;
+      const guessText = `${artist} - ${title}`;
       const newGuesses = [...guesses, guessText];
       const isLastGuess = newGuesses.length >= MAX_GUESSES;
 
@@ -207,7 +207,7 @@ export default function PlayPuzzle({ params }: Props) {
         setGuesses(newGuesses);
 
         if (result.correct || isLastGuess) {
-          // Game over — record play server-side; answer comes back in /play response.
+          // Game over - record play server-side; answer comes back in /play response.
           const won = result.correct;
           const stagesUsed = Math.max(1, Math.min(5, newGuesses.length));
           const playRes = await fetch(apiUrl(`/puzzles/${puzzle.id}/play`), {
@@ -226,7 +226,7 @@ export default function PlayPuzzle({ params }: Props) {
           return;
         }
 
-        // Wrong guess, game continues — shake and advance to next stage.
+        // Wrong guess, game continues - shake and advance to next stage.
         setLastWrong(true);
         setTimeout(() => setLastWrong(false), 600);
         if (stage < MAX_GUESSES - 1) setStage(stage + 1);
@@ -309,7 +309,7 @@ export default function PlayPuzzle({ params }: Props) {
     );
   }
 
-  // User not signed in at all — require sign-in before play.
+  // User not signed in at all - require sign-in before play.
   if (phase === "auth-gate") {
     return (
       <>
@@ -620,11 +620,11 @@ export default function PlayPuzzle({ params }: Props) {
           </div>
         </div>
 
-        {/* Stage content panels — stacked as more are revealed */}
+        {/* Stage content panels - stacked as more are revealed */}
         <AnimatePresence mode="wait">
           <motion.div key={stage} {...fadeUp} className="space-y-4">
 
-            {/* Stage 0 – Personal Clue (always visible once playing) */}
+            {/* Stage 0 - Personal Clue (always visible once playing) */}
             <div className="bg-card border border-border rounded-xl p-5">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5" /> Creator's clue
@@ -632,7 +632,7 @@ export default function PlayPuzzle({ params }: Props) {
               <p className="text-lg text-foreground italic leading-relaxed">"{puzzle.personalClue}"</p>
             </div>
 
-            {/* Stage 1 – Vibes & Themes */}
+            {/* Stage 1 - Vibes & Themes */}
             {stage >= 1 && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -661,7 +661,7 @@ export default function PlayPuzzle({ params }: Props) {
               </div>
             )}
 
-            {/* Stage 2 – Lyric Snippet */}
+            {/* Stage 2 - Lyric Snippet */}
             {stage >= 2 && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -677,7 +677,7 @@ export default function PlayPuzzle({ params }: Props) {
               </div>
             )}
 
-            {/* Stage 3 – Album Art */}
+            {/* Stage 3 - Album Art */}
             {stage >= 3 && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -693,7 +693,7 @@ export default function PlayPuzzle({ params }: Props) {
               </div>
             )}
 
-            {/* Stage 4 – Audio Preview */}
+            {/* Stage 4 - Audio Preview */}
             {stage >= 4 && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">

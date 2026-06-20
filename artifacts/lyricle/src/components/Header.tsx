@@ -51,7 +51,7 @@ export default function Header() {
     <header className="border-b border-border bg-white sticky top-0 z-50">
       <div className="container max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group">
-          <img src="/logo.svg" alt="Lyricle Logo" className="w-8 h-8 group-hover:scale-110 transition-transform" />
+          <img src={`${basePath}/logo.svg`} alt="Lyricle Logo" className="w-8 h-8 group-hover:scale-110 transition-transform" />
           <span className="font-serif text-2xl font-black tracking-tight text-primary">LYRICLE</span>
         </Link>
 

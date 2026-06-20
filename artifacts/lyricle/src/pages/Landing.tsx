@@ -122,19 +122,19 @@ const HOW_TO_PLAY = [
     step: "01",
     emoji: "🎯",
     title: "Start the Daily Puzzle",
-    description: "A brand new song drops every day at midnight. Every player gets the exact same puzzle — it's a level playing field.",
+    description: "A brand new song drops every day at midnight. Every player gets the exact same puzzle, so it's a level playing field.",
   },
   {
     step: "02",
     emoji: "🧩",
     title: "Unlock Clues Stage by Stage",
-    description: "Begin with mood & themes from the lyrics. Each wrong guess reveals a more direct clue — translated lines, snippets, word-by-word sync, and finally the audio.",
+    description: "Begin with mood & themes from the lyrics. Each wrong guess reveals a more direct clue: translated lines, snippets, word-by-word sync, and finally the audio.",
   },
   {
     step: "03",
     emoji: "✍️",
     title: "Type Your Guess",
-    description: "Search for the artist & song title using the autocomplete box. You have 5 guesses total — use them wisely.",
+    description: "Search for the artist & song title using the autocomplete box. You have 5 guesses total, so use them wisely.",
   },
   {
     step: "04",
@@ -193,7 +193,7 @@ export default function Landing() {
               <span className="text-primary">Challenge</span> your friends.
             </motion.h1>
             <motion.p variants={fadeUp} className="text-lg text-gray-500 leading-relaxed mb-8 max-w-md">
-              Play the daily music puzzle — five escalating clues, one mystery song. Or build your own and challenge friends. Free forever.
+              Play the daily music puzzle with five escalating clues and one mystery song. Or build your own and challenge friends. Free forever.
             </motion.p>
             <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
               <Button
