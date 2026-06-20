@@ -8,6 +8,7 @@ import partnerRouter from "./partner";
 import leaderboardRouter from "./leaderboard";
 import feedbackRouter from "./feedback";
 import devRouter from "./dev";
+import questsRouter from "./quests";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(partnerRouter);
 router.use(leaderboardRouter);
 router.use(feedbackRouter);
 router.use(devRouter);
+router.use(questsRouter);
 
 export default router;
