@@ -77,25 +77,26 @@ function MockPuzzleCard() {
         </div>
 
         <div className="px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-1.5 mb-2.5">
             <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 1 · Creator's Clue</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 1 · Vibes & Themes</span>
           </div>
-          <p className="text-sm text-gray-700 italic leading-relaxed">"This song defined my entire summer of '09"</p>
+          <div className="flex flex-wrap gap-1.5">
+            {["nostalgic", "summer", "uplifting"].map((t) => (
+              <span key={t} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
+                #{t}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-1.5 mb-2">
+<div className="flex items-center gap-1.5 mb-2">
             <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 2 · Vibes &amp; Themes</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 3 · Lyric Snippet</span>
           </div>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {["#nostalgia", "#summer", "#heartbreak"].map((tag) => (
-              <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-mono">{tag}</span>
-            ))}
+          <p className="text-sm text-gray-700 italic leading-relaxed font-mono">"♪ Summer nights and city lights..."</p>
           </div>
-          <p className="text-xs text-gray-400 italic font-sans">"Feeling nostalgic..."</p>
-        </div>
 
         <div className="px-5 py-4">
           <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mb-3">
@@ -127,7 +128,7 @@ const HOW_TO_PLAY = [
     step: "02",
     emoji: "🧩",
     title: "Unlock Clues Stage by Stage",
-    description: "Begin with Stage 1 — the creator's personal note about the song. Each wrong guess reveals a new, more direct clue.",
+    description: "Begin with mood & themes from the lyrics. Each wrong guess reveals a more direct clue — translated lines, snippets, word-by-word sync, and finally the audio.",
   },
   {
     step: "03",
@@ -183,27 +184,33 @@ export default function Landing() {
       <section className="pt-28 pb-20 px-6 overflow-hidden">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
           <motion.div variants={stagger} initial="hidden" animate="visible">
-            <motion.h1 variants={fadeUp} className="text-5xl md:text-6xl font-black text-gray-900 leading-[1.1] tracking-tight mb-6">
-              Guess the song.<br />Challenge your friends.
+            <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-5">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="text-xs font-semibold text-primary tracking-wide font-mono">A new puzzle every day</span>
+            </motion.div>
+            <motion.h1 variants={fadeUp} className="text-5xl md:text-6xl font-serif font-black text-gray-900 leading-[1.05] tracking-tight mb-6">
+              Guess the song.<br />
+              <span className="text-primary">Challenge</span> your friends.
             </motion.h1>
             <motion.p variants={fadeUp} className="text-lg text-gray-500 leading-relaxed mb-8 max-w-md">
-              Play the daily music puzzle — or create your own and send it to friends. Completely free.
+              Play the daily music puzzle — five escalating clues, one mystery song. Or build your own and challenge friends. Free forever.
             </motion.p>
             <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
               <Button
                 size="lg"
                 onClick={goToPlay}
-                className="bg-gray-900 hover:bg-gray-800 text-white font-bold px-8 h-12 rounded-full text-base transition-transform hover:scale-105 shadow-lg"
+                className="bg-primary hover:bg-primary/90 text-white font-bold px-8 h-12 rounded-full text-base transition-transform hover:scale-[1.03] shadow-lg shadow-primary/25"
               >
-                Play the Puzzle 🎵
+                Play the Daily Puzzle
+                <ArrowRight className="w-4 h-4" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={goToCreate}
-                className="h-12 rounded-full font-semibold px-8 bg-transparent border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="h-12 rounded-full font-semibold px-8 bg-transparent border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
               >
-                Create a Puzzle ✏️
+                Create a Puzzle
               </Button>
             </motion.div>
           </motion.div>
@@ -213,16 +220,19 @@ export default function Landing() {
       </section>
 
       {/* ── Trust / Partner Bar ─────────────────────────────────────── */}
-      <section className="py-8 border-y border-gray-100 bg-gray-50">
+      <section className="py-10 border-y border-gray-100 bg-gray-50/60">
         <div className="max-w-5xl mx-auto px-6">
-          <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
-            Powered by global music data:
+          <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-[0.2em] mb-6">
+            Powered by global music data
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-14">
-            {["Musixmatch Pro", "Songstats", "JamBase"].map((name) => (
-              <span key={name} className="text-sm font-bold text-gray-300 tracking-tight hover:text-gray-400 transition-colors">
-                {name}
-              </span>
+          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+            {["Musixmatch Pro", "Songstats", "JamBase"].map((name, i) => (
+              <div key={name} className="flex items-center gap-6 md:gap-10">
+                {i > 0 && <span className="hidden md:inline-block w-1 h-1 rounded-full bg-gray-300" />}
+                <span className="font-serif text-base font-bold text-gray-500 tracking-tight hover:text-primary transition-colors">
+                  {name}
+                </span>
+              </div>
             ))}
           </div>
         </div>
@@ -238,7 +248,7 @@ export default function Landing() {
             transition={{ duration: 0.5 }}
             className="text-center mb-4"
           >
-            <h2 className="text-4xl font-black text-gray-900 mb-3">How to Play Lyricle</h2>
+            <h2 className="text-4xl font-serif font-black text-gray-900 mb-3">How to Play Lyricle</h2>
             <p className="text-gray-500 max-w-xl mx-auto">
               Five stages. Five guesses. One song. A new puzzle every day.
             </p>
@@ -297,7 +307,7 @@ export default function Landing() {
             transition={{ duration: 0.5 }}
             className="text-center mb-12"
           >
-            <h2 className="text-4xl font-black text-gray-900 mb-3">Features &amp; Benefits</h2>
+            <h2 className="text-4xl font-serif font-black text-gray-900 mb-3">Features & Benefits</h2>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -312,7 +322,7 @@ export default function Landing() {
               >
                 <div className="text-3xl mb-4">{card.emoji}</div>
                 <h3 className="font-bold text-gray-900 mb-2 text-lg">
-                  {card.title} {card.emoji}
+                  {card.title}
                 </h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{card.description}</p>
               </motion.div>
@@ -322,54 +332,75 @@ export default function Landing() {
       </section>
 
       {/* ── Final CTA ───────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-[#f5f5f3]">
-        <div className="max-w-2xl mx-auto text-center">
+      <section className="py-24 px-6 bg-gradient-to-b from-white to-gray-50">
+        <div className="max-w-3xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight">
-              Ready to test your friends' music knowledge?
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-widest font-mono mb-5">
+              Free forever
+            </span>
+            <h2 className="text-4xl md:text-5xl font-serif font-black text-gray-900 mb-4 leading-[1.1]">
+              Ready to test your<br />music knowledge?
             </h2>
-            <p className="text-lg text-gray-500 mb-8">
-              No credit card required. Build your first custom puzzle in under 30 seconds.
+            <p className="text-lg text-gray-500 mb-8 max-w-md mx-auto">
+              No account needed to play. Sign in to create custom puzzles and climb the leaderboard.
             </p>
-            <Button
-              size="lg"
-              onClick={goToCreate}
-              className="bg-gray-900 hover:bg-gray-800 text-white font-bold px-10 h-12 rounded-full text-base transition-transform hover:scale-105 shadow-lg"
-            >
-              Start Creating Now
-            </Button>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Button
+                size="lg"
+                onClick={goToPlay}
+                className="bg-primary hover:bg-primary/90 text-white font-bold px-8 h-12 rounded-full text-base transition-transform hover:scale-[1.03] shadow-lg shadow-primary/25"
+              >
+                Play Today's Puzzle
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={goToCreate}
+                className="h-12 rounded-full font-semibold px-8 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+              >
+                Create a Puzzle
+              </Button>
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* ── Footer ─────────────────────────────────────────────────── */}
-      <footer className="border-t border-gray-100 py-8 px-6 bg-white">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <img src={`${basePath}/logo.svg`} alt="Lyricle" className="w-6 h-6" />
-            <span className="font-black text-lg text-primary tracking-tight">LYRICLE</span>
+      <footer className="border-t border-gray-100 py-10 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-6">
+            <div className="flex items-center gap-2">
+              <img src={`${basePath}/logo.svg`} alt="Lyricle" className="w-6 h-6" />
+              <span className="font-serif font-black text-lg text-primary tracking-tight">LYRICLE</span>
+            </div>
+
+            <nav className="flex items-center gap-6">
+              <button onClick={() => setLocation("/")} className="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">
+                Home
+              </button>
+              <button onClick={goToLeaderboard} className="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">
+                Leaderboard
+              </button>
+              <button onClick={goToCreate} className="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">
+                Create
+              </button>
+            </nav>
           </div>
 
-          <nav className="flex items-center gap-6">
-            <button onClick={() => setLocation("/")} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors">
-              Home
-            </button>
-            <button onClick={goToLeaderboard} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors">
-              Leaderboard
-            </button>
-            <button onClick={goToCreate} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors">
-              Create
-            </button>
-          </nav>
-
-          <p className="text-xs text-gray-400 text-center sm:text-right">
-            Lyrics provided by Musixmatch Pro. Concert data by JamBase.
-          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-6 border-t border-gray-100">
+            <p className="text-xs text-gray-400">
+              Made by mikacend (<a href="https://mikaships.site" target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-500 hover:text-primary transition-colors">mikaships.site</a>) · Lyrics by Musixmatch Pro · Concerts by JamBase
+            </p>
+            <p className="text-xs text-gray-400">
+              © {new Date().getFullYear()} Lyricle
+            </p>
+          </div>
         </div>
       </footer>
     </div>
