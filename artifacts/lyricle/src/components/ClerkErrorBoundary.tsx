@@ -23,9 +23,63 @@ function isClerkError(error: unknown): boolean {
 }
 
 export class ClerkErrorBoundary extends Component<Props, State> {
+  private timeoutId: any = null;
+
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false };
+  }
+
+  private handleError = (event: ErrorEvent | Event) => {
+    const target = event.target;
+    if (target instanceof HTMLScriptElement && target.src && target.src.includes("clerk")) {
+      console.warn("[Lyricle] Clerk script failed to load (resource error) — running in guest mode.", target.src);
+      this.setState({ hasError: true });
+      return;
+    }
+
+    if ("error" in event || "message" in event) {
+      const errEvent = event as ErrorEvent;
+      const err = errEvent.error || errEvent.message;
+      if (isClerkError(err)) {
+        console.warn("[Lyricle] Clerk failed to load (global error) — running in guest mode.", err);
+        this.setState({ hasError: true });
+      }
+    }
+  };
+
+  private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    if (isClerkError(event.reason)) {
+      console.warn("[Lyricle] Clerk failed to load (unhandled rejection) — running in guest mode.", event.reason);
+      this.setState({ hasError: true });
+    }
+  };
+
+  private handleClerkLoaded = () => {
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+  };
+
+  componentDidMount() {
+    window.addEventListener("error", this.handleError, true);
+    window.addEventListener("unhandledrejection", this.handleUnhandledRejection);
+    window.addEventListener("lyricle:clerk-loaded", this.handleClerkLoaded);
+
+    this.timeoutId = setTimeout(() => {
+      console.warn("[Lyricle] Clerk load timed out — falling back to guest mode.");
+      this.setState({ hasError: true });
+    }, 4000);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("error", this.handleError, true);
+    window.removeEventListener("unhandledrejection", this.handleUnhandledRejection);
+    window.removeEventListener("lyricle:clerk-loaded", this.handleClerkLoaded);
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+    }
   }
 
   static getDerivedStateFromError(error: unknown): State {

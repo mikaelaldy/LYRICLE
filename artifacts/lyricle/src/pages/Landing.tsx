@@ -4,6 +4,7 @@ import { useAuthUser } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import Header from "@/components/Header";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -15,47 +16,6 @@ const fadeUp = {
 const stagger = {
   visible: { transition: { staggerChildren: 0.12 } },
 };
-
-function LandingHeader({ user, setLocation }: { user: any; setLocation: (p: string) => void }) {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
-
-  return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm" : "bg-transparent"}`}>
-      <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src={`${basePath}/logo.svg`} alt="Lyricle" className="w-8 h-8" />
-          <span className="font-serif text-xl font-black tracking-tight text-primary">LYRICLE</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {user ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => setLocation("/game")} className="font-semibold text-gray-600">
-                Play
-              </Button>
-              <Button size="sm" onClick={() => setLocation("/create")} className="rounded-full font-bold px-5 bg-primary text-white hover:bg-primary/90 shadow-sm">
-                Create Puzzle
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => setLocation("/sign-in")} className="font-semibold text-gray-600" data-testid="landing-signin-button">
-                Sign in
-              </Button>
-              <Button size="sm" onClick={() => setLocation("/sign-up")} className="rounded-full font-bold px-5 bg-primary text-white hover:bg-primary/90 shadow-sm">
-                Play Free
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
 
 function MockPuzzleCard() {
   return (
@@ -178,7 +138,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden font-sans">
-      <LandingHeader user={user} setLocation={setLocation} />
+      <Header />
 
       {/* ── Hero ──────────────────────────────────────────────────────── */}
       <section className="pt-28 pb-20 px-6 overflow-hidden">
