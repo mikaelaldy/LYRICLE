@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
-import { Loader2, Headphones, FileText, Image, Trophy, ArrowRight, Sparkles } from "lucide-react";
+import { Loader2, Image, Swords, Trophy, ArrowRight } from "lucide-react";
 import Header from "@/components/Header";
 import GuessInput from "@/components/GuessInput";
 import AudioPlayer from "@/components/AudioPlayer";
@@ -16,6 +16,7 @@ interface DuelDetails {
   creatorName: string;
   creatorCluesUsed: number;
   creatorWon: boolean;
+  status: string;
 }
 
 interface UGCPuzzleData {
@@ -43,6 +44,13 @@ interface DailyClue {
   albumArtUrl?: string;
 }
 
+interface DuelResult {
+  won: boolean;
+  winnerId: string | null;
+  wager: number;
+  pointsDelta: number;
+}
+
 export default function PlayDuel({ params }: { params: { id: string } }) {
   const { user, isLoaded } = useUser();
   const [, setLocation] = useLocation();
@@ -52,14 +60,30 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
   const [guesses, setGuesses] = useState<string[]>([]);
   const [startTime] = useState(() => Date.now());
   const [guessing, setGuessing] = useState(false);
+  const [duelResult, setDuelResult] = useState<DuelResult | null>(null);
 
   // UGC State
   const [ugcPuzzle, setUgcPuzzle] = useState<UGCPuzzleData | null>(null);
   const [ugcMedia, setUgcMedia] = useState<UGCMediaData | null>(null);
   const [mediaLoading, setMediaLoading] = useState(false);
 
-  // Daily State
-  const [dailyClues, setDailyClues] = useState<DailyClue[]>([]);
+  // Daily State — only fetch clues as stages are revealed
+  const [dailyClues, setDailyClues] = useState<Map<number, DailyClue>>(new Map());
+  const [clueLoading, setClueLoading] = useState(false);
+
+  const fetchDailyClue = useCallback(async (s: number) => {
+    if (dailyClues.has(s)) return;
+    setClueLoading(true);
+    try {
+      const cRes = await fetch(`/api/puzzle/clue/${s}`);
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        setDailyClues((prev) => new Map(prev).set(s, cData));
+      }
+    } finally {
+      setClueLoading(false);
+    }
+  }, [dailyClues]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -73,30 +97,39 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
         const res = await fetch(`/api/duels/${params.id}`);
         const data = await res.json();
         if (res.ok) {
-          setDuel(data.duel);
-          if (data.duel.puzzleType === "ugc") {
-            // Load UGC Puzzle Metadata
-            const pRes = await fetch(`/api/puzzles/${data.duel.puzzleRef}`);
+          const fetchedDuel: DuelDetails = data.duel;
+          setDuel(fetchedDuel);
+
+          // Guard: completed duel
+          if (fetchedDuel.status === "completed") {
+            setLoading(false);
+            return;
+          }
+
+          // Guard: pending duel (no opponent yet)
+          if (fetchedDuel.status === "pending") {
+            toast({ title: "Duel not started yet", description: "Waiting for an opponent to accept.", variant: "destructive" });
+            setLocation("/lobby");
+            return;
+          }
+
+          if (fetchedDuel.puzzleType === "ugc") {
+            const pRes = await fetch(`/api/puzzles/${fetchedDuel.puzzleRef}`);
             const pData = await pRes.json();
             setUgcPuzzle(pData);
 
-            // Load UGC Puzzle Media
             setMediaLoading(true);
-            const mRes = await fetch(`/api/puzzles/${data.duel.puzzleRef}/media`);
+            const mRes = await fetch(`/api/puzzles/${fetchedDuel.puzzleRef}/media`);
             const mData = await mRes.json();
             setUgcMedia(mData);
             setMediaLoading(false);
           } else {
-            // Load Daily Puzzle Clues up to current stage
-            const cluesList: DailyClue[] = [];
-            for (let i = 0; i < 5; i++) {
-              const cRes = await fetch(`/api/puzzle/clue/${i}`);
-              if (cRes.ok) {
-                const cData = await cRes.json();
-                cluesList.push(cData);
-              }
+            // Fetch only stage 0 clue on load
+            const cRes = await fetch(`/api/puzzle/clue/0`);
+            if (cRes.ok) {
+              const cData = await cRes.json();
+              setDailyClues(new Map([[0, cData]]));
             }
-            setDailyClues(cluesList);
           }
         } else {
           toast({ title: "Duel not found", variant: "destructive" });
@@ -110,6 +143,12 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
     };
     fetchDuel();
   }, [params.id, user, isLoaded]);
+
+  // Fetch next clue whenever stage advances (daily only)
+  useEffect(() => {
+    if (!duel || duel.puzzleType !== "daily") return;
+    fetchDailyClue(stage);
+  }, [stage, duel?.puzzleType]);
 
   const handleGuess = async (artist: string, title: string) => {
     if (guessing) return;
@@ -139,7 +178,6 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
           }
         }
       } else {
-        // Daily puzzle guess check
         const res = await fetch("/api/puzzle/guess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -173,9 +211,16 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cluesUsed: cluesCount, solveTimeMs, won }),
       });
+      const data = await res.json();
       if (res.ok) {
-        toast({ title: "Duel completed!", description: "Your score was uploaded to the arena." });
-        setLocation("/lobby");
+        const iWon = data.winnerId === user?.id;
+        const wager = duel?.wager ?? 0;
+        const pointsDelta = data.winnerId
+          ? (iWon ? wager : -wager)
+          : 0; // tie = refund (net 0)
+        setDuelResult({ won: iWon, winnerId: data.winnerId, wager, pointsDelta });
+        // Notify header to refresh points
+        window.dispatchEvent(new Event("lyricle:points-updated"));
       } else {
         toast({ title: "Submission failed", variant: "destructive" });
       }
@@ -184,13 +229,62 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
     }
   };
 
-  if (loading || !duel) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin" />
       </div>
     );
   }
+
+  // Completed duel guard
+  if (duel?.status === "completed" && !duelResult) {
+    return (
+      <div className="min-h-screen bg-background text-foreground font-sans">
+        <Header />
+        <main className="container max-w-2xl mx-auto px-4 py-16 text-center">
+          <Trophy className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-3xl font-serif font-black mb-2">This duel is over</h2>
+          <p className="text-muted-foreground mb-6">The result has already been decided.</p>
+          <Button onClick={() => setLocation("/lobby")} className="rounded-full font-bold gap-2">
+            <ArrowRight className="w-4 h-4" /> Back to Lobby
+          </Button>
+        </main>
+      </div>
+    );
+  }
+
+  // Duel result card
+  if (duelResult) {
+    return (
+      <div className="min-h-screen bg-background text-foreground font-sans">
+        <Header />
+        <main className="container max-w-2xl mx-auto px-4 py-16 text-center">
+          <div className="bg-card border border-border rounded-3xl p-10 shadow-xl">
+            <Swords className="w-16 h-16 text-primary mx-auto mb-4" />
+            <h2 className="text-4xl font-serif font-black tracking-tight mb-2">
+              {duelResult.winnerId === null ? "It's a Tie!" : duelResult.won ? "You Won!" : "You Lost"}
+            </h2>
+            <p className="text-muted-foreground mb-6 text-lg">
+              {duelResult.winnerId === null
+                ? "Your wager was refunded."
+                : duelResult.won
+                ? `You earned +${duelResult.wager * 2} points from the pot!`
+                : `You lost ${duelResult.wager} points.`}
+            </p>
+            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-secondary border border-border font-mono font-black text-xl tabular-nums mb-8">
+              {duelResult.pointsDelta >= 0 ? "+" : ""}{duelResult.pointsDelta === 0 ? "±0" : (duelResult.won ? `+${duelResult.wager * 2}` : `-${duelResult.wager}`)} pts
+            </div>
+            <Button onClick={() => setLocation("/lobby")} className="w-full rounded-full font-bold uppercase tracking-widest gap-2 h-12">
+              <ArrowRight className="w-4 h-4" /> Back to Lobby
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!duel) return null;
 
   const maxStages = duel.puzzleType === "ugc" ? 4 : 5;
 
@@ -216,15 +310,13 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
         <div className="space-y-6">
           {duel.puzzleType === "ugc" ? (
             <div className="space-y-4">
-              {/* Stage 0 - Creator Clue */}
               {ugcPuzzle && (
                 <div className="bg-card border border-border rounded-xl p-5 shadow-md">
                   <span className="text-[10px] font-mono font-bold uppercase text-primary tracking-wider mb-2 block">Stage 1 · Personal Clue</span>
-                  <blockquote className="text-lg italic font-serif">“{ugcPuzzle.personalClue}”</blockquote>
+                  <blockquote className="text-lg italic font-serif">"{ugcPuzzle.personalClue}"</blockquote>
                 </div>
               )}
 
-              {/* Stage 1 - Lyrics snippet with masked line */}
               {stage >= 1 && (
                 <div className="bg-card border border-border rounded-xl p-5 shadow-md">
                   <span className="text-[10px] font-mono font-bold uppercase text-primary tracking-wider mb-2 block">Stage 2 · Masked Lyrics</span>
@@ -246,7 +338,6 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
                 </div>
               )}
 
-              {/* Stage 2 - Album Art */}
               {stage >= 2 && (
                 <div className="bg-card border border-border rounded-xl p-5 shadow-md">
                   <span className="text-[10px] font-mono font-bold uppercase text-primary tracking-wider mb-2 block">Stage 3 · Album Art</span>
@@ -260,7 +351,6 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
                 </div>
               )}
 
-              {/* Stage 3 - Audio Preview */}
               {stage >= 3 && (
                 <div className="bg-card border border-border rounded-xl p-5 shadow-md">
                   <span className="text-[10px] font-mono font-bold uppercase text-primary tracking-wider mb-2 block">Stage 4 · Audio Snippet</span>
@@ -275,10 +365,16 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
               )}
             </div>
           ) : (
-            // Daily puzzle clues
+            // Daily puzzle clues — loaded lazily per stage
             <div className="space-y-4">
-              {dailyClues.map((c, i) => {
-                if (i > stage) return null;
+              {clueLoading && !dailyClues.has(stage) && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              )}
+              {Array.from({ length: stage + 1 }, (_, i) => {
+                const c = dailyClues.get(i);
+                if (!c) return null;
                 return (
                   <div key={i} className="bg-card border border-border rounded-xl p-5 shadow-md">
                     <span className="text-[10px] font-mono font-bold uppercase text-primary tracking-wider mb-2 block">
@@ -294,19 +390,19 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
                             ))}
                           </div>
                         )}
-                        {c.mood && <p className="text-base italic text-muted-foreground font-serif">“Feeling {c.mood.toLowerCase()}…”</p>}
+                        {c.mood && <p className="text-base italic text-muted-foreground font-serif">"Feeling {c.mood.toLowerCase()}…"</p>}
                       </div>
                     )}
 
                     {i === 1 && (
                       <div>
                         <span className="text-xs font-mono text-muted-foreground block mb-1">In {c.translationLanguage}:</span>
-                        <blockquote className="text-lg italic font-serif">“{c.translatedLine}”</blockquote>
+                        <blockquote className="text-lg italic font-serif">"{c.translatedLine}"</blockquote>
                       </div>
                     )}
 
                     {i === 2 && (
-                      <blockquote className="text-lg font-bold font-serif">“{c.snippet}”</blockquote>
+                      <blockquote className="text-lg font-bold font-serif">"{c.snippet}"</blockquote>
                     )}
 
                     {i === 3 && (
@@ -336,7 +432,6 @@ export default function PlayDuel({ params }: { params: { id: string } }) {
         <div className="mt-8 bg-card border border-border p-6 rounded-2xl shadow-md">
           <GuessInput onGuess={handleGuess} disabled={guessing} />
 
-          {/* Recap of wrong guesses */}
           {guesses.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2 justify-center">
               {guesses.map((g, index) => (

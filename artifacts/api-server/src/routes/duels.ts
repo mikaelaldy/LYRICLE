@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import { getAuth } from "@clerk/express";
-import { db, duelsTable, userStatsTable } from "@workspace/db";
+import { db, duelsTable, userStatsTable, userQuestsTable } from "@workspace/db";
 import { eq, and, isNull, sql } from "drizzle-orm";
 
 const router = Router();
@@ -163,6 +163,33 @@ router.post("/duels/:id/submit", async (req, res): Promise<void> => {
     await db.update(userStatsTable).set({
       points: sql`${userStatsTable.points} + ${duel.wager}`
     }).where(eq(userStatsTable.userId, auth.userId));
+  }
+
+  // Increment "duelist" quest for the winner
+  if (winnerId) {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const [duelistQuest] = await db
+      .select()
+      .from(userQuestsTable)
+      .where(
+        and(
+          eq(userQuestsTable.userId, winnerId),
+          eq(userQuestsTable.date, todayStr),
+          eq(userQuestsTable.questId, "duelist")
+        )
+      )
+      .limit(1);
+
+    if (duelistQuest && !duelistQuest.completed) {
+      const newValue = Math.min(duelistQuest.targetValue, duelistQuest.currentValue + 1);
+      await db
+        .update(userQuestsTable)
+        .set({
+          currentValue: newValue,
+          completed: newValue >= duelistQuest.targetValue,
+        })
+        .where(eq(userQuestsTable.id, duelistQuest.id));
+    }
   }
 
   res.json({ success: true, winnerId });

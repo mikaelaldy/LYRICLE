@@ -89,7 +89,21 @@ export default function Lobby() {
   };
 
   const playDuel = async (id: string) => {
-    setLocation(`/duel/${id}`);
+    try {
+      const res = await fetch(`/api/duels/${id}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: user?.fullName || user?.username || "Anonymous" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLocation(`/duel/${id}`);
+      } else {
+        toast({ title: data.error || "Could not accept duel", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to accept duel", variant: "destructive" });
+    }
   };
 
   if (loading) {

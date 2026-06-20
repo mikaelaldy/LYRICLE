@@ -1,10 +1,35 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
+import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { dailyResultsTable, playerStreaksTable } from "@workspace/db";
+import { dailyResultsTable, playerStreaksTable, userStatsTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { GetPlayerStreakParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+// GET /users/me/points — returns current points balance for the logged-in user
+router.get("/users/me/points", async (req, res): Promise<void> => {
+  const auth = getAuth(req as Request);
+  if (!auth?.userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const [stats] = await db
+    .select({ points: userStatsTable.points, milestoneTier: userStatsTable.milestoneTier })
+    .from(userStatsTable)
+    .where(eq(userStatsTable.userId, auth.userId))
+    .limit(1);
+
+  if (!stats) {
+    // No row yet — create a zero-point row and return 0
+    await db.insert(userStatsTable).values({ userId: auth.userId }).onConflictDoNothing();
+    res.json({ points: 0, milestoneTier: "Street Busker" });
+    return;
+  }
+
+  res.json({ points: stats.points, milestoneTier: stats.milestoneTier });
+});
 
 // GET /players/:playerId/streak
 router.get("/players/:playerId/streak", async (req, res): Promise<void> => {

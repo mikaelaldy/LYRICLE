@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { dailyResultsTable, playerStreaksTable, userStatsTable } from "@workspace/db";
+import { dailyResultsTable, playerStreaksTable, userStatsTable, userQuestsTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import {
   GetPuzzleClueParams,
@@ -260,6 +260,41 @@ router.post("/puzzle/result", async (req, res): Promise<void> => {
         winCount: row.winCount + (won ? 1 : 0),
       })
       .where(eq(playerStreaksTable.playerId, playerId));
+  }
+
+  // Increment quest progress for sonic_speed and vibe_checker (first submit only)
+  if (existing.length === 0 && clerkUserId) {
+    const todayStr = today;
+    const questsToCheck: { questId: string; condition: boolean }[] = [
+      { questId: "sonic_speed", condition: won && solveTimeMs != null && solveTimeMs < 45000 },
+      { questId: "vibe_checker", condition: won && cluesUsed < 4 },
+    ];
+
+    for (const { questId, condition } of questsToCheck) {
+      if (!condition) continue;
+      const [quest] = await db
+        .select()
+        .from(userQuestsTable)
+        .where(
+          and(
+            eq(userQuestsTable.userId, clerkUserId),
+            eq(userQuestsTable.date, todayStr),
+            eq(userQuestsTable.questId, questId)
+          )
+        )
+        .limit(1);
+
+      if (quest && !quest.completed) {
+        const newValue = Math.min(quest.targetValue, quest.currentValue + 1);
+        await db
+          .update(userQuestsTable)
+          .set({
+            currentValue: newValue,
+            completed: newValue >= quest.targetValue,
+          })
+          .where(eq(userQuestsTable.id, quest.id));
+      }
+    }
   }
 
   res.json({ ok: true, streak: newStreak, pointsEarned: existing.length === 0 ? pointsEarned : 0 });
