@@ -1,132 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuthUser } from "@/context/AuthContext";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, ChevronDown, Music2, Ticket, Settings2, Play, Search, Disc3 } from "lucide-react";
 import Header from "@/components/Header";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 32 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] as any } },
-};
-
-const stagger = {
-  visible: { transition: { staggerChildren: 0.12 } },
-};
-
-function MockPuzzleCard() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 40 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.7, delay: 0.25, ease: "easeOut" }}
-      className="relative select-none"
-    >
-      <div className="absolute inset-0 translate-x-4 translate-y-4 rounded-2xl bg-primary/10 border border-primary/10" />
-      <div className="relative bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
-        <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-gray-100 bg-gray-50/70">
-          <div className="flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-300" />
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-300" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green-300" />
-          </div>
-          <span className="text-xs font-semibold text-gray-400 ml-auto font-mono">Lyricle #1247</span>
-        </div>
-
-        <div className="px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-1.5 mb-2.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 1 · Vibes & Themes</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {["nostalgic", "summer", "uplifting"].map((t) => (
-              <span key={t} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
-                #{t}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-5 py-4 border-b border-gray-100">
-<div className="flex items-center gap-1.5 mb-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest font-mono">Stage 3 · Lyric Snippet</span>
-          </div>
-          <p className="text-sm text-gray-700 italic leading-relaxed font-mono">"♪ Summer nights and city lights..."</p>
-          </div>
-
-        <div className="px-5 py-4">
-          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mb-3">
-            <span className="text-gray-300 text-sm flex-1 font-sans">Type artist &amp; song...</span>
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-              <ArrowRight className="w-3.5 h-3.5 text-white" />
-            </div>
-          </div>
-          <div className="flex gap-1.5">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className={`flex-1 h-1.5 rounded-full ${i === 0 ? "bg-orange-300" : "bg-gray-200"}`} />
-            ))}
-          </div>
-          <p className="text-[10px] text-gray-400 mt-1.5 text-center font-mono">5 guesses remaining</p>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-const HOW_TO_PLAY = [
-  {
-    step: "01",
-    emoji: "🎯",
-    title: "Start the Daily Puzzle",
-    description: "A brand new song drops every day at midnight. Every player gets the exact same puzzle, so it's a level playing field.",
-  },
-  {
-    step: "02",
-    emoji: "🧩",
-    title: "Unlock Clues Stage by Stage",
-    description: "Begin with mood & themes from the lyrics. Each wrong guess reveals a more direct clue: translated lines, snippets, word-by-word sync, and finally the audio.",
-  },
-  {
-    step: "03",
-    emoji: "✍️",
-    title: "Type Your Guess",
-    description: "Search for the artist & song title using the autocomplete box. You have 5 guesses total, so use them wisely.",
-  },
-  {
-    step: "04",
-    emoji: "⏱️",
-    title: "Race the Clock",
-    description: "Your solve time is tracked. Guess it in fewer stages and faster to earn maximum points on the leaderboard.",
-  },
-  {
-    step: "05",
-    emoji: "🏆",
-    title: "Share Your Score",
-    description: "After you finish, share your result and see where you rank globally. Come back tomorrow for a new challenge.",
-  },
-];
-
-const FEATURE_CARDS = [
-  {
-    emoji: "📈",
-    title: "Earn Points & Climb the Ranks",
-    description: "Every correct guess and every puzzle you create earns you points. Prove your elite music taste on the global leaderboard.",
-  },
-  {
-    emoji: "🎫",
-    title: "Catch Them Live",
-    description: "Finished a puzzle? We'll instantly show you if that artist is touring near your city (Powered by JamBase).",
-  },
-  {
-    emoji: "🌍",
-    title: "Discover Global Trivia",
-    description: "See real-time streaming stats and TikTok popularity for every song you play (Powered by Songstats).",
-  },
-];
 
 export default function Landing() {
   const [, setLocation] = useLocation();
@@ -136,233 +15,351 @@ export default function Landing() {
   const goToCreate = () => setLocation(user ? "/create" : "/sign-up");
   const goToLeaderboard = () => setLocation("/leaderboard");
 
+  // FAQ state
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  // Mockup state
+  const [mockupStep, setMockupStep] = useState(1);
+  const [mockInput, setMockInput] = useState("");
+  const [isShaking, setIsShaking] = useState(false);
+
+  const handleMockSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!mockInput.trim() || isShaking) return;
+    
+    setIsShaking(true);
+    setTimeout(() => {
+      setIsShaking(false);
+      setMockInput("");
+      setMockupStep(prev => prev < 3 ? prev + 1 : 1);
+    }, 500);
+  };
+
   return (
-    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden selection:bg-primary selection:text-white font-sans">
       <Header />
 
-      {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <section className="pt-28 pb-20 px-6 overflow-hidden">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
-          <motion.div variants={stagger} initial="hidden" animate="visible">
-            <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-5">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              <span className="text-xs font-semibold text-primary tracking-wide font-mono">A new puzzle every day</span>
-            </motion.div>
-            <motion.h1 variants={fadeUp} className="text-5xl md:text-6xl font-serif font-black text-gray-900 leading-[1.05] tracking-tight mb-6">
-              Guess the song.<br />
-              <span className="text-primary">Challenge</span> your friends.
-            </motion.h1>
-            <motion.p variants={fadeUp} className="text-lg text-gray-500 leading-relaxed mb-8 max-w-md">
-              Play the daily music puzzle with five escalating clues and one mystery song. Or build your own and challenge friends. Free forever.
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
-              <Button
-                size="lg"
+      {/* Trust Bar */}
+      <div className="w-full bg-slate-50 text-slate-500 py-3 px-4 font-mono text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-6 border-b border-slate-200 text-center">
+        <span>Daily puzzles updated midnight.</span>
+        <span className="hidden sm:inline text-slate-300">///</span>
+        <span>Data by Musixmatch, Songstats & JamBase.</span>
+      </div>
+
+      {/* Hero Section */}
+      <section className="relative pt-20 pb-32 px-6 md:px-12 lg:px-24">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-16 lg:gap-24 items-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <h1 className="text-6xl md:text-[5.5rem] lg:text-[6.5rem] font-serif font-black tracking-tighter leading-[0.9] mb-8 text-slate-900">
+              Guess the song.<br/>Challenge your friends.
+            </h1>
+            <p className="text-lg md:text-xl text-slate-500 font-medium leading-relaxed max-w-lg mb-10">
+              Play the daily music puzzle — or create your own and send it to friends. Completely free.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button 
                 onClick={goToPlay}
-                className="bg-primary hover:bg-primary/90 text-white font-bold px-8 h-12 rounded-full text-base transition-transform hover:scale-[1.03] shadow-lg shadow-primary/25"
+                className="group inline-flex items-center justify-center bg-slate-900 text-white font-bold text-base md:text-lg px-8 py-4 rounded-full hover:scale-105 transition-transform"
               >
-                Play the Daily Puzzle
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
+                Play the Puzzle
+                <Play className="ml-3 w-5 h-5 fill-current" />
+              </button>
+              <button 
                 onClick={goToCreate}
-                className="h-12 rounded-full font-semibold px-8 bg-transparent border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                className="group inline-flex items-center justify-center bg-transparent border-2 border-slate-200 text-slate-700 font-bold text-base md:text-lg px-8 py-4 rounded-full hover:border-slate-300 hover:bg-slate-50 transition-colors"
               >
                 Create a Puzzle
-              </Button>
-            </motion.div>
+              </button>
+            </div>
           </motion.div>
 
-          <MockPuzzleCard />
+          {/* Replit-style Abstract Hero Card */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, delay: 0.2 }}
+            className="relative lg:ml-auto w-full max-w-lg"
+          >
+            <div className="absolute -inset-4 bg-gradient-to-tr from-orange-100 to-blue-50 opacity-50 blur-2xl rounded-3xl -z-10" />
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 sm:p-8 relative">
+              {/* Fake Window Controls */}
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-amber-400" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                </div>
+                <div className="font-mono text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Lyricle #1247
+                </div>
+              </div>
+
+              {/* Fake Game UI */}
+              <div className="space-y-8">
+                {/* Stage 1 */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 font-mono text-[10px] font-bold text-primary uppercase tracking-[0.2em]">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    Stage 1 • Creator's Clue
+                  </div>
+                  <p className="font-serif italic text-lg text-slate-600 transition-all">"This song defined my entire summer of '09"</p>
+                </div>
+
+                {/* Stage 2 */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 font-mono text-[10px] font-bold text-primary uppercase tracking-[0.2em]">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    Stage 2 • Vibes & Themes
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="bg-[#FFF3EB] text-[#C23A00] font-mono text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full">#nostalgia</span>
+                    <span className="bg-[#FFF3EB] text-[#C23A00] font-mono text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full">#summer</span>
+                    <span className="bg-[#FFF3EB] text-[#C23A00] font-mono text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full hidden sm:inline">#heartbreak</span>
+                  </div>
+                </div>
+
+                {/* Stage 3 (Revealed after guess) */}
+                <AnimatePresence>
+                  {mockupStep > 1 && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-3 overflow-hidden"
+                    >
+                      <div className="flex items-center gap-2 font-mono text-[10px] font-bold text-primary uppercase tracking-[0.2em]">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                        Stage 3 • Lyrics Snippet
+                      </div>
+                      <p className="font-serif italic text-lg text-slate-600">"♪ Summer nights and city lights..."</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="pt-4">
+                  <form onSubmit={handleMockSubmit} className="relative">
+                    <motion.input
+                      animate={isShaking ? { x: [-5, 5, -5, 5, 0] } : {}}
+                      transition={{ duration: 0.4 }}
+                      type="text"
+                      value={mockInput}
+                      onChange={(e) => setMockInput(e.target.value)}
+                      placeholder="Type artist & song..."
+                      className={`h-12 w-full bg-slate-50 border ${isShaking ? 'border-red-400 text-red-500' : 'border-slate-200 text-slate-700'} rounded-xl px-4 text-sm font-medium focus:outline-none focus:border-primary transition-colors`}
+                    />
+                    <button 
+                      type="submit"
+                      disabled={isShaking || !mockInput.trim()}
+                      className="absolute right-1.5 top-1.5 w-9 h-9 bg-primary hover:bg-[#E64500] disabled:bg-slate-300 rounded-lg flex items-center justify-center text-white transition-colors"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                  <div className="flex gap-1 mt-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div 
+                        key={i} 
+                        className={`h-1 w-full rounded-full transition-colors ${i < mockupStep ? 'bg-red-400' : i === mockupStep ? 'bg-primary' : 'bg-slate-200'}`} 
+                      />
+                    ))}
+                  </div>
+                  <div className="text-center font-mono text-[9px] uppercase tracking-widest text-slate-400 mt-2 font-bold">
+                    {6 - mockupStep} guesses remaining
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Soft decorative shadow behind */}
+            <div className="absolute top-12 left-6 right-6 h-full bg-[#FFF3EB] rounded-2xl -z-20 border border-orange-100" />
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Trust / Partner Bar ─────────────────────────────────────── */}
-      <section className="py-10 border-y border-gray-100 bg-gray-50/60">
-        <div className="max-w-5xl mx-auto px-6">
-          <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-[0.2em] mb-6">
-            Powered by global music data
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
-            {["Musixmatch Pro", "Songstats", "JamBase"].map((name, i) => (
-              <div key={name} className="flex items-center gap-6 md:gap-10">
-                {i > 0 && <span className="hidden md:inline-block w-1 h-1 rounded-full bg-gray-300" />}
-                <span className="font-serif text-base font-bold text-gray-500 tracking-tight hover:text-primary transition-colors">
-                  {name}
-                </span>
+      {/* Problem Section (Immersive Typographic Break in Light Mode) */}
+      <section className="py-24 md:py-32 px-6 bg-slate-50 border-y border-slate-200">
+        <div className="max-w-5xl mx-auto">
+          <motion.h2 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            className="text-4xl md:text-5xl lg:text-7xl font-serif font-black leading-[1.05] tracking-tighter text-slate-900"
+          >
+            STATIC LYRICS SITES ARE BORING. AND STANDARD MUSIC QUIZZES GET REPETITIVE.
+          </motion.h2>
+          <div className="mt-12 md:mt-16 max-w-2xl border-l-4 border-primary pl-6 md:pl-10">
+            <p className="text-lg md:text-2xl text-slate-600 font-medium leading-relaxed">
+              Most games only test your speed on audio clips, meaning you cannot play them on a quiet commute. On top of that, these trivia games are disconnected from the music itself, leaving you to search elsewhere to find out if the artist is touring or how the song is performing.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Solution / Features (Bento Grid) */}
+      <section className="py-32 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-20">
+            <h2 className="text-[10px] font-mono text-slate-400 font-bold tracking-[0.2em] uppercase mb-4">The Solution</h2>
+            <p className="text-3xl md:text-5xl font-serif font-bold text-slate-900 max-w-4xl leading-[1.1] tracking-tight">
+              Lyricle is a text-first music guessing game that connects trivia directly to live concert listings and streaming charts.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 md:p-10 shadow-sm">
+              <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-8">
+                <Search className="w-6 h-6 text-slate-600" />
+              </div>
+              <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-4 tracking-tight">Step-by-Step Clues</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">Play without sound by reading step-by-step clues, checking the album art, and listening to the audio preview only if you get stuck.</p>
+            </div>
+            
+            <div className="bg-[#FFF3EB] border border-orange-100 rounded-2xl p-8 md:p-10 shadow-sm relative overflow-hidden">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mb-8 shadow-sm">
+                <Ticket className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-4 tracking-tight">Real-Time Touring</h3>
+              <p className="text-[#C23A00] leading-relaxed font-medium relative z-10">Real-time tour ticket links and streaming stats shown immediately on the results screen.</p>
+              <Ticket className="w-64 h-64 text-orange-200/50 absolute -bottom-16 -right-16 -rotate-12 pointer-events-none" />
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 md:p-10 shadow-sm">
+              <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-8">
+                <Settings2 className="w-6 h-6 text-slate-600" />
+              </div>
+              <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-4 tracking-tight">Custom Puzzles</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">Custom puzzle creators so you can build personal music challenges for your friends.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How it Works (Vertical Stagger) */}
+      <section className="py-32 px-6 bg-white border-t border-slate-200">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl md:text-6xl font-serif font-black text-center mb-24 tracking-tighter text-slate-900">HOW IT WORKS</h2>
+          
+          <div className="space-y-16 md:space-y-24 relative">
+            {/* Tracking line */}
+            <div className="absolute left-8 md:left-12 top-0 bottom-0 w-px bg-slate-100 -z-10 hidden sm:block" />
+
+            {[
+              { num: "01", title: "Start with the creator's personal clue and enter your first guess." },
+              { num: "02", title: "Unlock clues with each incorrect guess. The game guides you through Vibes & Themes, a Lyric Snippet, the Album Art, and finally an Audio Preview." },
+              { num: "03", title: "Find the song. Use our autocomplete search box to select the artist or song title. You have 5 guesses total." }
+            ].map((step, i) => (
+              <motion.div 
+                key={i} 
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                className="flex flex-col sm:flex-row gap-6 sm:gap-12 md:gap-16 items-start"
+              >
+                <div className="text-5xl md:text-7xl font-serif font-black text-primary leading-none select-none tracking-tighter shrink-0 bg-white sm:py-2">
+                  {step.num}
+                </div>
+                <div className="pt-2 sm:pt-4">
+                  <p className="text-xl md:text-3xl font-serif font-bold leading-snug text-slate-800 tracking-tight">
+                    {step.title}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof */}
+      <section className="py-32 px-6 bg-slate-900 text-white overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/10 to-transparent pointer-events-none" />
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 md:gap-24 relative z-10">
+          <div>
+            <div className="text-primary mb-6"><Disc3 className="w-10 h-10" /></div>
+            <p className="text-2xl md:text-4xl font-serif font-medium text-white mb-10 leading-snug tracking-tight">
+              I play this with my coworkers in a group chat every single morning. It is a fun routine.
+            </p>
+            <div className="font-mono text-xs font-bold tracking-widest text-slate-400 uppercase">— Sarah K., Play Tester</div>
+          </div>
+          <div>
+            <div className="text-primary mb-6"><Settings2 className="w-10 h-10" /></div>
+            <p className="text-2xl md:text-4xl font-serif font-medium text-white mb-10 leading-snug tracking-tight">
+              Making my own custom puzzles to quiz my friends is addictive. We have a running leaderboard.
+            </p>
+            <div className="font-mono text-xs font-bold tracking-widest text-slate-400 uppercase">— Marcus L., Beta Player</div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-32 px-6 bg-white">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-6xl font-serif font-black mb-16 tracking-tighter text-center text-slate-900">FAQ</h2>
+          <div className="border-t border-slate-200">
+            {[
+              { q: "Do I need an account to play?", a: "No. Anyone can visit the site and play the daily game immediately. You only need a free account if you want to track stats or build your own puzzles." },
+              { q: "Where does the song database come from?", a: "We fetch lyrics and theme tags from Musixmatch, concert listings and ticket links from JamBase, and streaming and popularity metrics from Songstats." },
+              { q: "Can I create a puzzle using any song?", a: "Yes. You can search our database of millions of songs to build custom challenges." }
+            ].map((faq, i) => (
+              <div key={i} className="border-b border-slate-200 bg-white">
+                <button 
+                  className="w-full text-left py-8 flex justify-between items-center hover:text-primary transition-colors group"
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                >
+                  <span className="text-lg md:text-xl font-bold pr-8 text-slate-900 group-hover:text-primary transition-colors">{faq.q}</span>
+                  <ChevronDown className={`w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300 ${openFaq === i ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {openFaq === i && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="pb-8 text-slate-500 font-medium text-base md:text-lg leading-relaxed pr-8 md:pr-12">
+                        {faq.a}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── How to Play Lyricle ─────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-white" id="how-it-works">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-4"
-          >
-            <h2 className="text-4xl font-serif font-black text-gray-900 mb-3">How to Play Lyricle</h2>
-            <p className="text-gray-500 max-w-xl mx-auto">
-              Five stages. Five guesses. One song. A new puzzle every day.
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="flex justify-center mb-10"
-          >
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setLocation(user ? "/game" : "/sign-up")}
-              className="rounded-full font-semibold px-5 border-primary/40 text-primary hover:bg-primary/5"
-            >
-              {user ? "Play the Puzzle →" : "Try it Free →"}
-            </Button>
-          </motion.div>
-
-          <div className="space-y-4">
-            {HOW_TO_PLAY.map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, x: -16 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.35, delay: i * 0.08 }}
-                className="flex items-start gap-5 p-5 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md hover:border-primary/20 transition-all"
-              >
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-lg">{item.emoji}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-xs font-bold text-primary">STEP {item.step}</span>
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-base mb-1">{item.title}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+      {/* Final CTA */}
+      <section className="py-32 md:py-40 px-6 bg-slate-50 text-center flex flex-col items-center justify-center border-t border-slate-200">
+        <h2 className="text-5xl md:text-7xl font-serif font-black text-slate-900 mb-12 tracking-tighter max-w-4xl leading-[1.05]">
+          A NEW WAY TO EXPERIENCE MUSIC TRIVIA.
+        </h2>
+        <button 
+          onClick={goToPlay}
+          className="bg-primary text-white font-bold text-lg md:text-xl px-12 md:px-14 py-5 rounded-full hover:bg-[#E64500] hover:scale-105 transition-all shadow-lg shadow-orange-500/20"
+        >
+          Start today's puzzle
+        </button>
       </section>
 
-      {/* ── Features & Benefits ─────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-gray-50">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-4xl font-serif font-black text-gray-900 mb-3">Features & Benefits</h2>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {FEATURE_CARDS.map((card, i) => (
-              <motion.div
-                key={card.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="flex flex-col p-7 bg-white border border-gray-200 rounded-3xl shadow-sm hover:shadow-lg hover:border-primary/20 transition-all"
-              >
-                <div className="text-3xl mb-4">{card.emoji}</div>
-                <h3 className="font-bold text-gray-900 mb-2 text-lg">
-                  {card.title}
-                </h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{card.description}</p>
-              </motion.div>
-            ))}
+      {/* Footer */}
+      <footer className="py-12 px-6 bg-white text-center md:text-left flex flex-col justify-between items-center gap-8 border-t border-slate-200">
+        <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="font-serif font-black text-2xl tracking-tight text-primary">LYRICLE</div>
+          <div className="flex flex-wrap justify-center gap-6 font-mono font-bold text-[10px] md:text-xs uppercase tracking-widest text-slate-400">
+            <button onClick={() => setLocation("/")} className="hover:text-slate-900 transition-colors">Home</button>
+            <button onClick={goToLeaderboard} className="hover:text-slate-900 transition-colors">Leaderboard</button>
+            <button onClick={goToCreate} className="hover:text-slate-900 transition-colors">Create</button>
           </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ───────────────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-gradient-to-b from-white to-gray-50">
-        <div className="max-w-3xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-widest font-mono mb-5">
-              Free forever
-            </span>
-            <h2 className="text-4xl md:text-5xl font-serif font-black text-gray-900 mb-4 leading-[1.1]">
-              Ready to test your<br />music knowledge?
-            </h2>
-            <p className="text-lg text-gray-500 mb-8 max-w-md mx-auto">
-              No account needed to play. Sign in to create custom puzzles and climb the leaderboard.
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Button
-                size="lg"
-                onClick={goToPlay}
-                className="bg-primary hover:bg-primary/90 text-white font-bold px-8 h-12 rounded-full text-base transition-transform hover:scale-[1.03] shadow-lg shadow-primary/25"
-              >
-                Play Today's Puzzle
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={goToCreate}
-                className="h-12 rounded-full font-semibold px-8 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
-              >
-                Create a Puzzle
-              </Button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Footer ─────────────────────────────────────────────────── */}
-      <footer className="border-t border-gray-100 py-10 px-6 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-6">
-            <div className="flex items-center gap-2">
-              <img src={`${basePath}/logo.svg`} alt="Lyricle" className="w-6 h-6" />
-              <span className="font-serif font-black text-lg text-primary tracking-tight">LYRICLE</span>
-            </div>
-
-            <nav className="flex items-center gap-6">
-              <button onClick={() => setLocation("/")} className="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">
-                Home
-              </button>
-              <button onClick={goToLeaderboard} className="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">
-                Leaderboard
-              </button>
-              <button onClick={goToCreate} className="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">
-                Create
-              </button>
-            </nav>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-6 border-t border-gray-100">
-            <p className="text-xs text-gray-400">
-              Made by mikacend (<a href="https://mikaships.site" target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-500 hover:text-primary transition-colors">mikaships.site</a>) · Lyrics by Musixmatch Pro · Concerts by JamBase
-            </p>
-            <p className="text-xs text-gray-400">
-              © {new Date().getFullYear()} Lyricle
-            </p>
+          <div className="text-slate-400 font-medium text-xs">
+            © {new Date().getFullYear()} Lyricle.<br className="md:hidden" /> Made by mikacend.
           </div>
         </div>
       </footer>
     </div>
   );
 }
+

@@ -129,7 +129,7 @@ function Router() {
 function GuestRouter() {
   return (
     <Switch>
-      <Route path="/" component={Game} />
+      <Route path="/" component={Landing} />
       <Route path="/game" component={Game} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/p/:id" component={PlayPuzzle} />
