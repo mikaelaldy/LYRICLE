@@ -78,13 +78,18 @@ router.get("/puzzle/autocomplete", async (req, res): Promise<void> => {
 
   const mxmTracks = await searchTracks(query.data.q, 8);
 
+  function filterNocover(url: string | null | undefined): string | null {
+    if (!url) return null;
+    return url.includes("nocover") ? null : url;
+  }
+
   if (mxmTracks.length > 0) {
     res.json({
       tracks: mxmTracks.map((t) => ({
         displayName: `${t.artist_name} — ${t.track_name}`,
         artist: t.artist_name,
         title: t.track_name,
-        albumArtUrl: t.album_coverart_100x100 || null,
+        albumArtUrl: filterNocover(t.album_coverart_100x100),
       })),
     });
     return;
@@ -129,7 +134,14 @@ router.post("/puzzle/guess", async (req, res): Promise<void> => {
 });
 
 // GET /puzzle/answer
-router.get("/puzzle/answer", async (_req, res): Promise<void> => {
+// Requires the caller to confirm they have completed the puzzle.
+// A proper server-side check (via submitted daily result) is the right long-term fix;
+// the query-param guard is a lightweight client-honesty check for now.
+router.get("/puzzle/answer", async (req, res): Promise<void> => {
+  if (req.query.completed !== "true") {
+    res.status(403).json({ error: "Complete the puzzle before viewing the answer." });
+    return;
+  }
   const reveal = await getSongReveal();
   if (!reveal) {
     res.status(503).json({ error: "Answer unavailable" });

@@ -100,18 +100,22 @@ export default function ResultModal({
   onOpenLeaderboard,
 }: ResultModalProps) {
   const { data: answer } = useGetPuzzleAnswer({ query: { enabled: open, queryKey: getGetPuzzleAnswerQueryKey() } });
+  function getSavedPlayerId(): string {
+    try {
+      const raw = localStorage.getItem("lyricle_player");
+      return raw ? JSON.parse(raw).playerId ?? "" : "";
+    } catch {
+      return "";
+    }
+  }
+
+  const savedPlayerId = getSavedPlayerId();
   const { data: streak } = useGetPlayerStreak(
-    localStorage.getItem("lyricle_player")
-      ? JSON.parse(localStorage.getItem("lyricle_player")!).playerId
-      : "",
+    savedPlayerId,
     {
       query: {
         enabled: open,
-        queryKey: getGetPlayerStreakQueryKey(
-          localStorage.getItem("lyricle_player")
-            ? JSON.parse(localStorage.getItem("lyricle_player")!).playerId
-            : "",
-        ),
+        queryKey: getGetPlayerStreakQueryKey(savedPlayerId),
       },
     },
   );
@@ -451,7 +455,7 @@ export default function ResultModal({
           <Button
             onClick={async () => {
               try {
-                const res = await fetch("/api/duels", {
+                const res = await fetch(apiUrl("/duels"), {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({

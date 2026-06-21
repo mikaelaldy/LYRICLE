@@ -90,10 +90,16 @@ router.get("/search", async (req, res): Promise<void> => {
       }
     }
 
+    function filterNocover(url: string | null | undefined): string | null {
+      if (!url) return null;
+      return url.includes("nocover") ? null : url;
+    }
+
     res.json({
       tracks: mxmTracks.map((t) => {
-        const mxmArt = t.album_coverart_800x800 || t.album_coverart_100x100 || null;
-        // Fall back to iTunes art when MXM art is absent
+        const rawMxmArt = t.album_coverart_800x800 || t.album_coverart_100x100 || null;
+        const mxmArt = filterNocover(rawMxmArt);
+        // Fall back to iTunes art when MXM art is absent or is a nocover placeholder
         const itunesArt = !mxmArt
           ? (itunesMap.get(`${normalize(t.track_name)}|${normalize(t.artist_name)}`) ?? null)
           : null;

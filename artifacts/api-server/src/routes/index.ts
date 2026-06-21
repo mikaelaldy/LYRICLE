@@ -17,7 +17,7 @@ router.use(healthRouter);
 router.use(puzzleRouter);
 router.use(playersRouter);
 router.use(statsRouter);
-router.use(ugcRouter);
+router.use("/ugc", ugcRouter);
 router.use(partnerRouter);
 router.use(leaderboardRouter);
 router.use(feedbackRouter);

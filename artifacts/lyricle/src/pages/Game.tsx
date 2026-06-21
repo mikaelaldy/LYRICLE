@@ -234,11 +234,13 @@ export default function Game() {
         <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md px-6">
-            <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest mb-4">Setup Required</p>
-            <h2 className="text-3xl font-serif font-bold text-foreground mb-3">API Key Missing</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              The Musixmatch API key (MXM_KEY) is not configured. Add it in the Secrets tab to start playing.
+            <h2 className="text-3xl font-serif font-bold text-foreground mb-3">Something went wrong</h2>
+            <p className="text-muted-foreground leading-relaxed mb-6">
+              We couldn't load today's puzzle. Please try again.
             </p>
+            <Button onClick={() => window.location.reload()} className="gap-2">
+              <Loader2 className="w-4 h-4" /> Retry
+            </Button>
           </div>
         </div>
       </div>

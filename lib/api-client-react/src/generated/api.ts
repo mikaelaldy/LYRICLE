@@ -447,7 +447,7 @@ export const getGetPuzzleAnswerUrl = () => {
 
 
 
-  return `/api/puzzle/answer`
+  return `/api/puzzle/answer?completed=true`
 }
 
 /**
