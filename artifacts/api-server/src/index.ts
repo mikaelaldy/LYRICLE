@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { initAlbumArtCache } from "./lib/album-art-cache";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,7 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Pre-cache album art for all curated songs so autocomplete is instant.
+  initAlbumArtCache();
 });
