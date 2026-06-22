@@ -8,6 +8,8 @@ import {
   Star,
   Pencil,
   Music,
+  ArrowLeft,
+  X,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuthUser } from "@/context/AuthContext";
@@ -91,6 +93,14 @@ export default function Leaderboard() {
   const { user } = useAuthUser();
   const highlightMe = useHighlightMe();
 
+  const [showBanner, setShowBanner] = useState(highlightMe);
+
+  useEffect(() => {
+    if (!highlightMe) return;
+    const timer = setTimeout(() => setShowBanner(false), 5000);
+    return () => clearTimeout(timer);
+  }, [highlightMe]);
+
   const [guessers, setGuessers] = useState<LeaderboardResponse<GuesserEntry> | null>(null);
   const [guessersLoading, setGuessersLoading] = useState(true);
 
@@ -140,6 +150,25 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Header />
+
+      {showBanner && (
+        <div
+          data-testid="back-to-game-banner"
+          className="bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-300"
+        >
+          <Link href="/" onClick={() => setShowBanner(false)} className="flex items-center gap-2 font-mono text-sm font-semibold uppercase tracking-widest hover:opacity-80 transition-opacity">
+            <ArrowLeft className="w-4 h-4 shrink-0" />
+            Back to today's result
+          </Link>
+          <button
+            onClick={() => setShowBanner(false)}
+            aria-label="Dismiss"
+            className="p-1 rounded hover:bg-primary-foreground/20 transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <main className="container max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">
