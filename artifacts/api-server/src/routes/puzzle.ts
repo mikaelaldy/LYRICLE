@@ -110,13 +110,25 @@ router.get("/puzzle/autocomplete", async (req, res): Promise<void> => {
   }
 
   // Last resort: curated song list (offline-safe)
+  // Enrich with iTunes art via parallel lookups (best-effort, 3 s timeout)
   const curated = searchCuratedSongs(query.data.q, 8);
+  const artResults = await Promise.allSettled(
+    curated.map((s) =>
+      Promise.race([
+        searchItunesTracks(`${s.artistName} ${s.trackName}`, 1).then(
+          (hits) => hits[0]?.artworkUrl600 ?? null,
+        ),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      ]),
+    ),
+  );
   res.json({
-    tracks: curated.map((s) => ({
+    tracks: curated.map((s, i) => ({
       displayName: `${s.artistName} — ${s.trackName}`,
       artist: s.artistName,
       title: s.trackName,
-      albumArtUrl: null,
+      albumArtUrl:
+        artResults[i].status === "fulfilled" ? artResults[i].value : null,
     })),
   });
 });

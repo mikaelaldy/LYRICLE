@@ -78,10 +78,25 @@ export default function GuessInput({ onGuess, disabled }: GuessInputProps) {
                     >
                       <div className="w-10 h-10 shrink-0 bg-muted rounded flex items-center justify-center overflow-hidden border border-border">
                         {track.albumArtUrl ? (
-                          <img src={track.albumArtUrl} alt={track.title} width={40} height={40} loading="lazy" className="w-full h-full object-cover" />
-                        ) : (
-                          <Music className="w-5 h-5 opacity-20" />
-                        )}
+                          <img
+                            src={track.albumArtUrl}
+                            alt={track.title}
+                            width={40}
+                            height={40}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = "none";
+                              const fallback = target.nextElementSibling as HTMLElement | null;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <Music
+                          className="w-5 h-5 opacity-20"
+                          style={{ display: track.albumArtUrl ? "none" : "flex" }}
+                        />
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className="font-medium truncate text-foreground">{track.title}</span>
